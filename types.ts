@@ -4,11 +4,12 @@ export interface Game {
   author: string;
   description: string;
   coverUrl: string;
+  fileUrl: string; // The actual .z5, .z8, or .gblorb file URL
   dateInstalled: string;
   lastPlayed: string;
   playtime: string;
   genre: string;
-  isAiStory?: boolean; // If true, uses Gemini to generate the story
+  isAiStory?: boolean;
 }
 
 export interface SaveFile {
@@ -16,14 +17,7 @@ export interface SaveFile {
   gameId: string;
   timestamp: string;
   locationName: string;
-  screenshotUrl?: string; // Placeholder for save state visual
-}
-
-export interface StoryMessage {
-  id: string;
-  role: 'system' | 'user' | 'assistant';
-  text: string;
-  imageUrl?: string; // If the user requested a visualization
+  screenshotUrl?: string; 
 }
 
 export enum SortOption {

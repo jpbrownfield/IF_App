@@ -24,8 +24,7 @@ const App: React.FC = () => {
         lastPlayed: new Date().toISOString(),
     };
     setLibraryGames(prev => [newGame, ...prev]);
-    // Optional: Switch to library immediately?
-    // setActiveTab(AppTab.Library); 
+    setActiveTab(AppTab.Library); 
   };
 
   const handlePlayGame = (game: Game, save?: SaveFile) => {
