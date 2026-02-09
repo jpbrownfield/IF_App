@@ -1,5 +1,8 @@
 import { Game, SaveFile } from './types';
 
+// A generic dark placeholder image for when IFDB hotlinking fails
+export const PLACEHOLDER_COVER = "https://placehold.co/400x600/18181b/52525b?text=IF";
+
 // Real games hosted on the IF Archive or compatible mirrors
 export const INITIAL_GAMES: Game[] = [
   {
@@ -12,7 +15,9 @@ export const INITIAL_GAMES: Game[] = [
     dateInstalled: '2023-01-15T10:00:00Z',
     lastPlayed: '2023-10-25T14:30:00Z',
     playtime: '15m',
-    genre: 'Slice of Life'
+    genre: 'Slice of Life',
+    rating: 4.2,
+    publishDate: '2000-01-01'
   },
   {
     id: '2',
@@ -24,7 +29,9 @@ export const INITIAL_GAMES: Game[] = [
     dateInstalled: '2023-05-20T09:00:00Z',
     lastPlayed: '2023-09-12T18:45:00Z',
     playtime: '2h',
-    genre: 'Comedy'
+    genre: 'Comedy',
+    rating: 4.8,
+    publishDate: '2007-09-01'
   }
 ];
 
@@ -39,7 +46,9 @@ export const STORE_GAMES: Game[] = [
     dateInstalled: '',
     lastPlayed: '',
     playtime: '0m',
-    genre: 'Espionage'
+    genre: 'Espionage',
+    rating: 4.9,
+    publishDate: '1998-02-01'
   },
   {
     id: '4',
@@ -51,7 +60,9 @@ export const STORE_GAMES: Game[] = [
     dateInstalled: '',
     lastPlayed: '',
     playtime: '0m',
-    genre: 'Drama'
+    genre: 'Drama',
+    rating: 4.6,
+    publishDate: '2000-02-01'
   },
   {
     id: '5',
@@ -63,7 +74,9 @@ export const STORE_GAMES: Game[] = [
     dateInstalled: '',
     lastPlayed: '',
     playtime: '0m',
-    genre: 'Fantasy'
+    genre: 'Fantasy',
+    rating: 4.5,
+    publishDate: '2004-11-01'
   },
   {
     id: '6',
@@ -75,7 +88,9 @@ export const STORE_GAMES: Game[] = [
     dateInstalled: '',
     lastPlayed: '',
     playtime: '0m',
-    genre: 'Fairytale'
+    genre: 'Fairytale',
+    rating: 4.3,
+    publishDate: '2006-03-01'
   }
 ];
 

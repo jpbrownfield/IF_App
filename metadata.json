@@ -1,5 +1,5 @@
 {
   "name": "FableForge - Interactive Fiction",
-  "description": "A modern Interactive Fiction interpreter with AI-powered visualization and storytelling capabilities. Manage your library, discover new stories, and immerse yourself in text adventures.",
+  "description": "A professional-grade PWA designed for Android packaging. Features IndexedDB binary storage for true offline play, TWA compatibility for Play Store distribution, and a modern Z-Machine/Glulx interpreter.",
   "requestFramePermissions": []
 }

@@ -10,6 +10,8 @@ export interface Game {
   playtime: string;
   genre: string;
   isAiStory?: boolean;
+  rating?: number;
+  publishDate?: string;
 }
 
 export interface SaveFile {
