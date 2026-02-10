@@ -78,9 +78,10 @@ const Player: React.FC<PlayerProps> = ({ game, onExit, onAutosave }) => {
   
   // Use local interpreter for ALL games to ensure saves persist on the same origin (github.io)
   // This avoids 3rd-party cookie blocking issues with iplayif.com inside an iframe
+  // Note: We use './' to support subdirectories (like GitHub Pages repositories)
   const interpreterUrl = isOfflineMode 
-      ? `/interpreter.html?gameId=${encodeURIComponent(game.id)}`
-      : `/interpreter.html?story=${encodeURIComponent(game.fileUrl)}`;
+      ? `./interpreter.html?gameId=${encodeURIComponent(game.id)}`
+      : `./interpreter.html?story=${encodeURIComponent(game.fileUrl)}`;
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col h-screen overflow-hidden">

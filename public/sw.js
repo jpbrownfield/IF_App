@@ -37,9 +37,13 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
   // Handle local game file requests (Virtual File System)
-  // This allows us to provide a stable URL for the interpreter, ensuring autosaves work.
-  if (url.pathname.startsWith('/local-game/')) {
-      const gameId = decodeURIComponent(url.pathname.split('/local-game/')[1]);
+  // We check if the path *contains* /local-game/ to support subdirectory deployments (GitHub Pages)
+  if (url.pathname.includes('/local-game/')) {
+      const parts = url.pathname.split('/local-game/');
+      // parts[1] is everything after /local-game/
+      if (!parts[1]) return; // Skip if no ID provided
+      
+      const gameId = decodeURIComponent(parts[1]);
       event.respondWith(
           (async () => {
               try {

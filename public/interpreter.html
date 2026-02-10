@@ -21,7 +21,9 @@
 
         if (gameId) {
             // Local DB game (from offline cache)
-            finalStoryUrl = `/local-game/${encodeURIComponent(gameId)}`;
+            // Use relative path to work correctly in subdirectories (GitHub Pages)
+            // This will resolve to ./local-game/:id relative to this file
+            finalStoryUrl = `local-game/${encodeURIComponent(gameId)}`;
         } else if (remoteStoryUrl) {
             // Remote game - Use a CORS proxy to ensure we can load it from github.io
             // strategy: try corsproxy.io first as it handles binary well
