@@ -88,47 +88,54 @@ export const searchGamesOnWeb = async (query: string): Promise<Game[]> => {
   let xmlText = "";
   let errorLog: string[] = [];
 
-  // Strategy 1: Direct Fetch (Best for Native/Server)
-  try {
-      const response = await fetch(targetUrl);
-      if (response.ok) {
-          xmlText = await response.text();
-      } else {
-          errorLog.push("Direct fetch status: " + response.status);
-          throw new Error("Direct fetch status: " + response.status);
-      }
-  } catch (directError) {
-      errorLog.push("Direct fetch failed");
-      console.warn("Direct fetch failed, attempting Proxy 1 (CorsProxy.io)...");
-
-      // Strategy 2: CorsProxy.io
+  // Helper for racing fetches
+  const fetchWithTimeout = async (url: string, timeout = 5000) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
       try {
-        const proxyUrl = `${PROXY_CORSPROXY}${encodeURIComponent(targetUrl)}`;
-        const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error("CorsProxy status: " + response.status);
-        
-        xmlText = await response.text();
-      } catch (proxy1Error) {
-          errorLog.push("CorsProxy failed");
-          console.warn("CorsProxy failed, attempting Proxy 2 (AllOrigins)...");
+          const response = await fetch(url, { signal: controller.signal });
+          clearTimeout(id);
+          if (!response.ok) throw new Error(`Status ${response.status}`);
+          return response;
+      } catch (e) {
+          clearTimeout(id);
+          throw e;
+      }
+  };
 
-          // Strategy 3: AllOrigins Proxy
+  // Strategy: Try AllOrigins (reliable JSON) first, then CorsProxy (sometimes faster but flaky), then Direct (fail fast)
+  try {
+      // 1. AllOrigins (JSONP style - reliable)
+      const allOriginsUrl = `${PROXY_ALLORIGINS}${encodeURIComponent(targetUrl)}`;
+      console.log("Attempting Search via AllOrigins...");
+      const response = await fetchWithTimeout(allOriginsUrl, 8000);
+      const data = await response.json();
+      if (data && data.contents) {
+          xmlText = data.contents;
+      } else {
+          throw new Error("AllOrigins no content");
+      }
+  } catch (aoError) {
+      console.warn("AllOrigins failed:", aoError);
+      errorLog.push("AllOrigins failed");
+
+      try {
+          // 2. CorsProxy.io (Backup)
+          const corsProxyUrl = `${PROXY_CORSPROXY}${encodeURIComponent(targetUrl)}`;
+          console.log("Attempting Search via CorsProxy...");
+          const response = await fetchWithTimeout(corsProxyUrl, 8000);
+          xmlText = await response.text();
+      } catch (cpError) {
+          console.warn("CorsProxy failed:", cpError);
+          errorLog.push("CorsProxy failed");
+
           try {
-              // Encode target URL for the proxy query param
-              const proxyUrl = `${PROXY_ALLORIGINS}${encodeURIComponent(targetUrl)}`;
-              const response = await fetch(proxyUrl);
-              if (!response.ok) throw new Error("AllOrigins status: " + response.status);
-              
-              const data = await response.json();
-              if (data && data.contents) {
-                  xmlText = data.contents;
-              } else {
-                  throw new Error("AllOrigins no content");
-              }
-          } catch (proxy2Error) {
-             errorLog.push("AllOrigins failed");
-             console.error("All online search strategies failed.", errorLog);
-             // Fall through to offline DB
+             // 3. Direct (Last resort)
+             console.log("Attempting Search Direct...");
+             const response = await fetchWithTimeout(targetUrl, 3000);
+             xmlText = await response.text();
+          } catch (dError) {
+             errorLog.push("Direct failed");
           }
       }
   }

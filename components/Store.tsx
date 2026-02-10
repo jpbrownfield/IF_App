@@ -43,20 +43,46 @@ const Store: React.FC<StoreProps> = ({ onInstall, installedGameIds }) => {
 
   const handleInstallWithDownload = async (game: Game) => {
     setIsDownloadingId(game.id);
+    let blob: Blob | null = null;
+    
+    // Download Helper with Fallbacks
+    const downloadStrategies = [
+        // Strategy 1: CorsProxy.io (Usually fastest for binary)
+        async () => {
+             const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(game.fileUrl)}`;
+             const res = await fetch(proxyUrl);
+             if (!res.ok) throw new Error("CorsProxy failed");
+             return await res.blob();
+        },
+        // Strategy 2: AllOrigins Raw (Reliable backup)
+        async () => {
+             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(game.fileUrl)}`;
+             const res = await fetch(proxyUrl);
+             if (!res.ok) throw new Error("AllOrigins failed");
+             return await res.blob();
+        }
+    ];
+
     try {
-        // Use a CORS proxy to fetch the binary file
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(game.fileUrl)}`;
-        const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error("Failed to download game file");
-        
-        const blob = await response.blob();
+        // Try strategies in sequence
+        for (const strategy of downloadStrategies) {
+            try {
+                blob = await strategy();
+                if (blob && blob.size > 0) break;
+            } catch (e) {
+                console.warn("Download strategy failed, trying next...", e);
+            }
+        }
+
+        if (!blob) throw new Error("All download strategies failed.");
+
         await saveGameFile(game.id, blob);
         
         // After successful download, add to library
         onInstall(game);
     } catch (error) {
         console.error("Download failed:", error);
-        alert("Failed to download game for offline use. Check your connection.");
+        alert("Failed to download game. The source server might be blocking requests or down.");
     } finally {
         setIsDownloadingId(null);
     }

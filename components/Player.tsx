@@ -76,8 +76,11 @@ const Player: React.FC<PlayerProps> = ({ game, onExit, onAutosave }) => {
 
   const gameFileUrl = localUrl || game.fileUrl;
   
-  // do_vm_autosave=1 ensures Parchment uses its internal browser storage
-  const interpreterUrl = `https://iplayif.com/?story=${encodeURIComponent(gameFileUrl)}&do_vm_autosave=1`;
+  // Use local interpreter for offline games to support autosave via stable URL
+  // Use remote interpreter for online games
+  const interpreterUrl = isOfflineMode 
+      ? `/interpreter.html?gameId=${encodeURIComponent(game.id)}`
+      : `https://iplayif.com/?story=${encodeURIComponent(gameFileUrl)}&do_vm_autosave=1`;
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col h-screen overflow-hidden">

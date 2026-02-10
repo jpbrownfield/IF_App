@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>FableForge Interpreter</title>
+    <style>
+        body { margin: 0; padding: 0; background: #000; color: #ccc; overflow: hidden; }
+        #parchment { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+        /* Hide Parchment header/footer if possible via CSS */
+        .parchment-top, .parchment-bottom { display: none !important; }
+    </style>
+    <!-- Pre-configure Parchment -->
+    <script>
+        // Get game ID from URL query
+        const params = new URLSearchParams(window.location.search);
+        const gameId = params.get('gameId');
+        
+        // If gameId is present, we construct the local URL
+        // The Service Worker intercepts /local-game/:id
+        const storyUrl = gameId ? `/local-game/${encodeURIComponent(gameId)}` : null;
+
+        // Configure Parchment Options
+        window.parchment_options = {
+            // If story URL is provided, Parchment loads it
+            default_story: storyUrl ? [storyUrl] : undefined,
+            // Enable autosave (uses URL as key)
+            do_vm_autosave: 1,
+            // Hide "About" dialog on start
+            lock_story: 1,
+            // Theme customization
+            theme: {
+                css: 'https://iplayif.com/parchment.css', // Or local
+            }
+        };
+    </script>
+    <script src="https://iplayif.com/parchment.js"></script>
+</head>
+<body>
+    <div id="parchment"></div>
+</body>
+</html>
