@@ -22,12 +22,12 @@
         if (gameId) {
             // Local DB game (from offline cache)
             // Use relative path to work correctly in subdirectories (GitHub Pages)
-            // This will resolve to ./local-game/:id relative to this file
             finalStoryUrl = `local-game/${encodeURIComponent(gameId)}`;
         } else if (remoteStoryUrl) {
-            // Remote game - Use a CORS proxy to ensure we can load it from github.io
-            // strategy: try corsproxy.io first as it handles binary well
-            finalStoryUrl = `https://corsproxy.io/?${encodeURIComponent(remoteStoryUrl)}`;
+            // Remote game - Use our Service Worker proxy route
+            // This provides a STABLE URL for the game, which is crucial for autosaves to persist.
+            // The Service Worker intercepts /remote-game-proxy/ and handles the CORS fetching.
+            finalStoryUrl = `remote-game-proxy/${encodeURIComponent(remoteStoryUrl)}`;
         }
 
         // Configure Parchment Options

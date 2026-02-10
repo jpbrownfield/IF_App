@@ -114,6 +114,7 @@ const App: React.FC = () => {
     if (activeTab === AppTab.Player && activeGame) {
       return (
         <Player 
+          key={activeGame.id}
           game={activeGame} 
           initialSave={activeSave} 
           onExit={handleExitGame} 

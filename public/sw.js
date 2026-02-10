@@ -37,11 +37,9 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
   // Handle local game file requests (Virtual File System)
-  // We check if the path *contains* /local-game/ to support subdirectory deployments (GitHub Pages)
   if (url.pathname.includes('/local-game/')) {
       const parts = url.pathname.split('/local-game/');
-      // parts[1] is everything after /local-game/
-      if (!parts[1]) return; // Skip if no ID provided
+      if (!parts[1]) return; 
       
       const gameId = decodeURIComponent(parts[1]);
       event.respondWith(
@@ -63,18 +61,65 @@ self.addEventListener('fetch', (event) => {
 
                   if (!blob) return new Response('Game not found', { status: 404 });
                   
-                  // Return the blob as a file response
-                  const filename = `game-${gameId}.z5`; // Default extension, MIME type detection handles it mostly
                   return new Response(blob, {
                       headers: {
                           'Content-Type': 'application/octet-stream',
-                          'Content-Disposition': `inline; filename="${filename}"`
+                          'Content-Disposition': `inline; filename="game.z5"`
                       }
                   });
               } catch (e) {
                   console.error("SW: Failed to serve local game", e);
-                  return new Response('Error loading game', { status: 500 });
+                  return new Response('Error loading local game', { status: 500 });
               }
+          })()
+      );
+      return;
+  }
+
+  // Handle Remote Game Proxy (Stable URL for Autosaves + CORS Bypass)
+  // Maps /remote-game-proxy/<encoded_url> to the actual file content via proxies
+  if (url.pathname.includes('/remote-game-proxy/')) {
+      const parts = url.pathname.split('/remote-game-proxy/');
+      if (!parts[1]) return;
+
+      const targetUrl = decodeURIComponent(parts[1]);
+      
+      event.respondWith(
+          (async () => {
+              const proxies = [
+                  // 1. CorsProxy.io (Fast, binary support)
+                  (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+                  // 2. AllOrigins Raw (Backup)
+                  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`
+              ];
+
+              for (const createProxyUrl of proxies) {
+                  try {
+                      const proxyUrl = createProxyUrl(targetUrl);
+                      const response = await fetch(proxyUrl);
+                      if (response.ok) {
+                          // Return a new response to ensure headers are clean/correct for Parchment
+                          const blob = await response.blob();
+                          return new Response(blob, {
+                              status: 200,
+                              headers: {
+                                  'Content-Type': 'application/octet-stream',
+                                  'Cache-Control': 'public, max-age=31536000' // Cache aggressively
+                              }
+                          });
+                      }
+                  } catch (e) {
+                      console.warn(`Proxy failed for ${targetUrl}`, e);
+                  }
+              }
+
+              // Fallback: Try direct (might work if CORS is enabled on source)
+              try {
+                  const directRes = await fetch(targetUrl);
+                  if (directRes.ok) return directRes;
+              } catch (e) { /* ignore */ }
+
+              return new Response("Failed to load game file from all sources.", { status: 502 });
           })()
       );
       return;
