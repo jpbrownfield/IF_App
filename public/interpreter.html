@@ -15,15 +15,23 @@
         // Get game ID from URL query
         const params = new URLSearchParams(window.location.search);
         const gameId = params.get('gameId');
+        const remoteStoryUrl = params.get('story');
         
-        // If gameId is present, we construct the local URL
-        // The Service Worker intercepts /local-game/:id
-        const storyUrl = gameId ? `/local-game/${encodeURIComponent(gameId)}` : null;
+        let finalStoryUrl = null;
+
+        if (gameId) {
+            // Local DB game (from offline cache)
+            finalStoryUrl = `/local-game/${encodeURIComponent(gameId)}`;
+        } else if (remoteStoryUrl) {
+            // Remote game - Use a CORS proxy to ensure we can load it from github.io
+            // strategy: try corsproxy.io first as it handles binary well
+            finalStoryUrl = `https://corsproxy.io/?${encodeURIComponent(remoteStoryUrl)}`;
+        }
 
         // Configure Parchment Options
         window.parchment_options = {
             // If story URL is provided, Parchment loads it
-            default_story: storyUrl ? [storyUrl] : undefined,
+            default_story: finalStoryUrl ? [finalStoryUrl] : undefined,
             // Enable autosave (uses URL as key)
             do_vm_autosave: 1,
             // Hide "About" dialog on start

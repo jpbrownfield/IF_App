@@ -31,20 +31,25 @@ const parseIfdbXml = (xmlText: string): Game[] => {
       
       const title = getTag("title") || "Unknown Title";
       const author = getTag("author") || "Unknown Author";
-      const description = getTag("headline"); 
+      // IFDB returns 'headline' for short description, 'description' for long
+      let description = getTag("headline");
+      if (!description || description.length < 10) {
+          description = getTag("description");
+      }
+      if (!description) description = "No description available.";
       
       // Try to find cover art
       let coverUrl = node.getElementsByTagName("coverart")[0]?.getElementsByTagName("url")[0]?.textContent || "";
       if (!coverUrl) {
           coverUrl = "https://ifdb.org/IMG/20/0x/200x53gb5k48p7.jpg"; // Default placeholder
-      } else if (coverUrl.startsWith("http:")) {
-          // Upgrade HTTP images to HTTPS to prevent mixed content warnings
-          coverUrl = coverUrl.replace("http:", "https:");
       }
 
       const ratingStr = getTag("averageRating");
       const rating = ratingStr ? parseFloat(ratingStr) : 0;
-      const publishDate = getTag("published");
+      // Handle NaN if parseFloat fails
+      const safeRating = isNaN(rating) ? 0 : rating;
+
+      const publishDate = getTag("published") || getTag("firstpublished");
 
       // Logic to find a playable file URL
       let fileUrl = "";
@@ -58,27 +63,31 @@ const parseIfdbXml = (xmlText: string): Game[] => {
 
       if (playLink) {
         fileUrl = playLink.getElementsByTagName("url")[0]?.textContent || "";
-        // Force HTTPS for the game file to avoid mixed content blocks in the interpreter
-        if (fileUrl.startsWith("http:")) {
-            fileUrl = fileUrl.replace("http:", "https:");
-        }
+        // Note: We rely on the CORS proxy in the interpreter to handle HTTP->HTTPS bridging
+        // forcing HTTPS here can break links to legacy archives.
+      } else {
+        // If no playable link found, try to find a direct download link that matches extensions
+        // Sometimes IFDB doesn't wrap them in specific link tags but they might be in other structures, 
+        // but for now, if no playable link, we skip this game or mark it.
+        // For the store, we only want playable games.
+        return null;
       }
 
       return {
         id: `ifdb-${index}-${Date.now()}`,
         title,
         author,
-        description,
+        description: description.substring(0, 300) + (description.length > 300 ? "..." : ""),
         coverUrl,
         fileUrl,
         dateInstalled: "",
         lastPlayed: "",
         playtime: "0m",
         genre: "Interactive Fiction",
-        rating,
+        rating: safeRating,
         publishDate
       };
-    });
+    }).filter(g => g !== null) as Game[];
 };
 
 export const searchGamesOnWeb = async (query: string): Promise<Game[]> => {

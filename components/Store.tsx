@@ -42,50 +42,10 @@ const Store: React.FC<StoreProps> = ({ onInstall, installedGameIds }) => {
   };
 
   const handleInstallWithDownload = async (game: Game) => {
-    setIsDownloadingId(game.id);
-    let blob: Blob | null = null;
-    
-    // Download Helper with Fallbacks
-    const downloadStrategies = [
-        // Strategy 1: CorsProxy.io (Usually fastest for binary)
-        async () => {
-             const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(game.fileUrl)}`;
-             const res = await fetch(proxyUrl);
-             if (!res.ok) throw new Error("CorsProxy failed");
-             return await res.blob();
-        },
-        // Strategy 2: AllOrigins Raw (Reliable backup)
-        async () => {
-             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(game.fileUrl)}`;
-             const res = await fetch(proxyUrl);
-             if (!res.ok) throw new Error("AllOrigins failed");
-             return await res.blob();
-        }
-    ];
-
-    try {
-        // Try strategies in sequence
-        for (const strategy of downloadStrategies) {
-            try {
-                blob = await strategy();
-                if (blob && blob.size > 0) break;
-            } catch (e) {
-                console.warn("Download strategy failed, trying next...", e);
-            }
-        }
-
-        if (!blob) throw new Error("All download strategies failed.");
-
-        await saveGameFile(game.id, blob);
-        
-        // After successful download, add to library
-        onInstall(game);
-    } catch (error) {
-        console.error("Download failed:", error);
-        alert("Failed to download game. The source server might be blocking requests or down.");
-    } finally {
-        setIsDownloadingId(null);
-    }
+    // "Download" is now just adding to library as a bookmark
+    // We rely on the online interpreter (or cached version) to load it at runtime
+    // This bypasses the CORS issues with downloading binary blobs directly in the browser
+    onInstall(game);
   };
 
   const displayGames = useMemo(() => {
@@ -146,15 +106,32 @@ const Store: React.FC<StoreProps> = ({ onInstall, installedGameIds }) => {
 
           return (
             <div key={game.id} className="flex bg-zinc-900 p-4 rounded-xl border border-zinc-800 shadow-sm hover:border-zinc-600 transition-colors">
-              <img src={getProxiedImageUrl(game.coverUrl)} alt={game.title} className="w-20 h-28 object-cover rounded-lg bg-zinc-800" />
+              <img 
+                src={getProxiedImageUrl(game.coverUrl)} 
+                alt={game.title} 
+                className="w-20 h-28 object-cover rounded-lg bg-zinc-800"
+                loading="lazy"
+                onError={(e) => {
+                    (e.target as HTMLImageElement).src = PLACEHOLDER_COVER;
+                    (e.target as HTMLImageElement).onerror = null;
+                }}
+              />
               <div className="ml-4 flex-1 flex flex-col justify-between">
                 <div>
                    <h3 className="font-bold text-zinc-100">{game.title}</h3>
                    <p className="text-xs text-zinc-400 mt-1">{game.author}</p>
-                   <p className="text-sm text-zinc-500 mt-2 line-clamp-2">{game.description}</p>
+                   <p className="text-sm text-zinc-500 mt-2 line-clamp-2">{game.description || "No description available."}</p>
                 </div>
                 <div className="flex justify-between items-center mt-3">
-                    <span className="text-[10px] text-zinc-600"> {game.publishDate ? new Date(game.publishDate).getFullYear() : 'Unknown'} </span>
+                    <div className="flex items-center space-x-3 text-[10px] text-zinc-500 font-medium">
+                        <span>{game.publishDate && !isNaN(new Date(game.publishDate).getFullYear()) ? new Date(game.publishDate).getFullYear() : 'Unknown'}</span>
+                        {(game.rating || 0) > 0 && (
+                            <span className="flex items-center text-amber-500">
+                                <Star size={10} className="fill-current mr-1" />
+                                {(game.rating || 0).toFixed(1)}
+                            </span>
+                        )}
+                    </div>
                     <button
                         onClick={() => !isInstalled && !isDownloading && handleInstallWithDownload(game)}
                         disabled={isInstalled || isDownloading}

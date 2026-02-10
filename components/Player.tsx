@@ -76,11 +76,11 @@ const Player: React.FC<PlayerProps> = ({ game, onExit, onAutosave }) => {
 
   const gameFileUrl = localUrl || game.fileUrl;
   
-  // Use local interpreter for offline games to support autosave via stable URL
-  // Use remote interpreter for online games
+  // Use local interpreter for ALL games to ensure saves persist on the same origin (github.io)
+  // This avoids 3rd-party cookie blocking issues with iplayif.com inside an iframe
   const interpreterUrl = isOfflineMode 
       ? `/interpreter.html?gameId=${encodeURIComponent(game.id)}`
-      : `https://iplayif.com/?story=${encodeURIComponent(gameFileUrl)}&do_vm_autosave=1`;
+      : `/interpreter.html?story=${encodeURIComponent(game.fileUrl)}`;
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col h-screen overflow-hidden">
