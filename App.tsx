@@ -11,13 +11,23 @@ const App: React.FC = () => {
   
   // State with LocalStorage persistence initialization
   const [libraryGames, setLibraryGames] = useState<Game[]>(() => {
-    const saved = localStorage.getItem('fableforge_games');
-    return saved ? JSON.parse(saved) : INITIAL_GAMES;
+    try {
+      const saved = localStorage.getItem('fableforge_games');
+      return saved ? JSON.parse(saved) : INITIAL_GAMES;
+    } catch (e) {
+      console.error("Failed to parse games from storage", e);
+      return INITIAL_GAMES;
+    }
   });
 
   const [saves, setSaves] = useState<SaveFile[]>(() => {
-    const saved = localStorage.getItem('fableforge_saves');
-    return saved ? JSON.parse(saved) : MOCK_SAVES;
+    try {
+      const saved = localStorage.getItem('fableforge_saves');
+      return saved ? JSON.parse(saved) : MOCK_SAVES;
+    } catch (e) {
+      console.error("Failed to parse saves from storage", e);
+      return MOCK_SAVES;
+    }
   });
 
   const [activeGame, setActiveGame] = useState<Game | null>(null);
