@@ -83,6 +83,7 @@ self.addEventListener('fetch', (event) => {
       if (!parts[1]) return;
 
       const targetUrl = decodeURIComponent(parts[1]);
+      console.log(`[SW] Proxying request for: ${targetUrl}`);
       
       event.respondWith(
           (async () => {
@@ -96,29 +97,35 @@ self.addEventListener('fetch', (event) => {
               for (const createProxyUrl of proxies) {
                   try {
                       const proxyUrl = createProxyUrl(targetUrl);
+                      console.log(`[SW] Trying proxy: ${proxyUrl}`);
                       const response = await fetch(proxyUrl);
                       if (response.ok) {
                           // Return a new response to ensure headers are clean/correct for Parchment
                           const blob = await response.blob();
+                          console.log(`[SW] Successfully fetched via proxy. Size: ${blob.size}`);
                           return new Response(blob, {
                               status: 200,
                               headers: {
                                   'Content-Type': 'application/octet-stream',
-                                  'Cache-Control': 'public, max-age=31536000' // Cache aggressively
+                                  // Add Access-Control-Allow-Origin just in case, though SW response usually ignores it for same-origin
+                                  'Access-Control-Allow-Origin': '*',
+                                  'Cache-Control': 'public, max-age=31536000' 
                               }
                           });
                       }
                   } catch (e) {
-                      console.warn(`Proxy failed for ${targetUrl}`, e);
+                      console.warn(`[SW] Proxy failed for ${targetUrl}`, e);
                   }
               }
 
               // Fallback: Try direct (might work if CORS is enabled on source)
               try {
+                  console.log(`[SW] Trying direct fetch: ${targetUrl}`);
                   const directRes = await fetch(targetUrl);
                   if (directRes.ok) return directRes;
               } catch (e) { /* ignore */ }
 
+              console.error(`[SW] All strategies failed for ${targetUrl}`);
               return new Response("Failed to load game file from all sources.", { status: 502 });
           })()
       );
