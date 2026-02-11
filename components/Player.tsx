@@ -76,12 +76,11 @@ const Player: React.FC<PlayerProps> = ({ game, onExit, onAutosave }) => {
 
   const gameFileUrl = localUrl || game.fileUrl;
   
-  // Use local interpreter for ALL games to ensure saves persist on the same origin (github.io)
-  // This avoids 3rd-party cookie blocking issues with iplayif.com inside an iframe
-  // Note: We use './' to support subdirectories (like GitHub Pages repositories)
+  // Use local parchment build for ALL games to ensure saves persist on the same origin
+  // We construct the 'story' parameter to point to our Service Worker virtual paths
   const interpreterUrl = isOfflineMode 
-      ? `./interpreter.html?gameId=${encodeURIComponent(game.id)}`
-      : `./interpreter.html?story=${encodeURIComponent(game.fileUrl)}`;
+      ? `./parchment.html?story=local-game/${encodeURIComponent(game.id)}`
+      : `./parchment.html?story=remote-game-proxy/${encodeURIComponent(game.fileUrl)}`;
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col h-screen overflow-hidden">
