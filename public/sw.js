@@ -1,24 +1,18 @@
 
-const CACHE_NAME = 'fableforge-v2';
+const CACHE_NAME = 'fableforge-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
-  'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap'
-];
-
-// Essential interpreter assets
-const INTERPRETER_ASSETS = [
-    'https://iplayif.com/',
-    'https://iplayif.com/parchment.js'
+  './parchment.html'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([...ASSETS_TO_CACHE, ...INTERPRETER_ASSETS]);
+      // We only strictly require local assets for installation
+      return cache.addAll(ASSETS_TO_CACHE);
     })
   );
 });
@@ -136,16 +130,19 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
-        // Cache the new version if it's a valid response
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+        // Only cache successful same-origin responses
+        // This prevents CORS errors with external CDNs like Tailwind
+        const isSameOrigin = url.origin === self.location.origin;
+        if (isSameOrigin && networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
                 cache.put(event.request, responseToCache);
             });
         }
         return networkResponse;
-      }).catch(() => {
-          // If network fails, we rely purely on cache
+      }).catch((err) => {
+          // If network fails, we rely on cache
+          console.warn("[SW] Fetch failed:", event.request.url, err);
       });
       
       return cachedResponse || fetchPromise;
