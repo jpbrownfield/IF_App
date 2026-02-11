@@ -36,8 +36,9 @@
 
         // Configure Parchment Options
         window.parchment_options = {
-            // Point to local library folder for engine files (wasm/js)
-            lib_path: 'lib/',
+            // Point to local library folder (relative to web.js location, which is in lib/)
+            // We use './' so web.js (in lib/) imports './bocfel.js' (resolving to lib/bocfel.js)
+            lib_path: './',
             
             // If story URL is provided, Parchment loads it
             default_story: finalStoryUrl ? [finalStoryUrl] : undefined,
