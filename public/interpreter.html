@@ -6,9 +6,14 @@
     <title>FableForge Interpreter</title>
     <style>
         body { margin: 0; padding: 0; background: #000; color: #ccc; overflow: hidden; }
-        #parchment { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+        #gameport { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
         /* Hide Parchment header/footer if possible via CSS */
         .parchment-top, .parchment-bottom { display: none !important; }
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: #888; display: flex; align-items: center; justify-content: center;
+            font-family: monospace; z-index: 1000;
+        }
     </style>
     <!-- Pre-configure Parchment -->
     <script>
@@ -21,17 +26,19 @@
 
         if (gameId) {
             // Local DB game (from offline cache)
-            // Use relative path to work correctly in subdirectories (GitHub Pages)
             finalStoryUrl = `local-game/${encodeURIComponent(gameId)}`;
         } else if (remoteStoryUrl) {
             // Remote game - Use our Service Worker proxy route
-            // This provides a STABLE URL for the game, which is crucial for autosaves to persist.
-            // The Service Worker intercepts /remote-game-proxy/ and handles the CORS fetching.
             finalStoryUrl = `remote-game-proxy/${encodeURIComponent(remoteStoryUrl)}`;
         }
 
+        console.log("Interpreter: Loading story from:", finalStoryUrl);
+
         // Configure Parchment Options
         window.parchment_options = {
+            // Point to local library folder for engine files (wasm/js)
+            lib_path: 'lib/',
+            
             // If story URL is provided, Parchment loads it
             default_story: finalStoryUrl ? [finalStoryUrl] : undefined,
             // Enable autosave (uses URL as key)
@@ -40,13 +47,29 @@
             lock_story: 1,
             // Theme customization
             theme: {
-                css: 'https://iplayif.com/parchment.css', // Or local
-            }
+                css: 'lib/web.css', 
+            },
+            // Auto launch the game
+            auto_launch: 1
         };
+        
+        // Hide loading overlay when Parchment is ready (approximate)
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay) overlay.style.display = 'none';
+            }, 3000); // Give it a moment to initialize
+        });
     </script>
-    <script src="https://iplayif.com/parchment.js"></script>
+    <script src="lib/jquery.min.js"></script>
+    <script type="module" src="lib/web.js"></script>
 </head>
 <body>
-    <div id="parchment"></div>
+    <div id="loading-overlay">Initializing FableForge Interpreter...</div>
+    <div id="gameport">
+        <div id="windowport"></div>
+        <div id="loadingpane">Loading...</div>
+        <div id="errorpane" style="display:none;"><div id="errorcontent"></div></div>
+    </div>
 </body>
 </html>
