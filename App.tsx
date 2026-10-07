@@ -1,156 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Library from './components/Library';
-import Store from './components/Store';
-import Player from './components/Player';
 import Navigation from './components/Navigation';
-import { AppTab, Game, SaveFile } from './types';
-import { INITIAL_GAMES, MOCK_SAVES } from './constants';
+import Player from './components/Player';
+import Settings from './components/Settings';
+import Store from './components/Store';
+import { readSettings, saveSettings } from './services/settings';
+import { AppTab, InstalledGame } from './types';
 
-const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<AppTab>(AppTab.Library);
-  
-  // State with LocalStorage persistence initialization
-  const [libraryGames, setLibraryGames] = useState<Game[]>(() => {
-    try {
-      const saved = localStorage.getItem('fableforge_games');
-      return saved ? JSON.parse(saved) : INITIAL_GAMES;
-    } catch (e) {
-      console.error("Failed to parse games from storage", e);
-      return INITIAL_GAMES;
-    }
-  });
+const LIBRARY_KEY = 'fableforge.library.v2';
 
-  const [saves, setSaves] = useState<SaveFile[]>(() => {
-    try {
-      const saved = localStorage.getItem('fableforge_saves');
-      return saved ? JSON.parse(saved) : MOCK_SAVES;
-    } catch (e) {
-      console.error("Failed to parse saves from storage", e);
-      return MOCK_SAVES;
-    }
-  });
+function readLibrary(): InstalledGame[] {
+  try {
+    const value = localStorage.getItem(LIBRARY_KEY);
+    return value ? JSON.parse(value) as InstalledGame[] : [];
+  } catch {
+    return [];
+  }
+}
 
-  const [activeGame, setActiveGame] = useState<Game | null>(null);
-  const [activeSave, setActiveSave] = useState<SaveFile | undefined>(undefined);
-  
-  // Persistence effects
-  useEffect(() => {
-    localStorage.setItem('fableforge_games', JSON.stringify(libraryGames));
-  }, [libraryGames]);
+export default function App() {
+  const [activeTab, setActiveTab] = useState(AppTab.Library);
+  const [games, setGames] = useState<InstalledGame[]>(readLibrary);
+  const [activeGame, setActiveGame] = useState<InstalledGame | null>(null);
+  const [settings, setSettings] = useState(readSettings);
 
   useEffect(() => {
-    localStorage.setItem('fableforge_saves', JSON.stringify(saves));
-  }, [saves]);
+    localStorage.setItem(LIBRARY_KEY, JSON.stringify(games));
+  }, [games]);
 
-  const handleInstallGame = (game: Game) => {
-    // Avoid duplicates
-    if (libraryGames.some(g => g.id === game.id)) {
-        setActiveTab(AppTab.Library);
-        return;
-    }
+  useEffect(() => saveSettings(settings), [settings]);
 
-    const newGame = {
-        ...game,
-        dateInstalled: new Date().toISOString(),
-        lastPlayed: new Date().toISOString(),
-    };
-    setLibraryGames(prev => [newGame, ...prev]);
-    setActiveTab(AppTab.Library); 
-  };
-
-  const handlePlayGame = (game: Game, save?: SaveFile) => {
-    setActiveGame(game);
-    setActiveSave(save);
-    setActiveTab(AppTab.Player);
-  };
-
-  const handleExitGame = () => {
-    // Update last played
-    if (activeGame) {
-        setLibraryGames(prev => prev.map(g => 
-            g.id === activeGame.id 
-            ? { ...g, lastPlayed: new Date().toISOString() } 
-            : g
-        ));
-    }
-    setActiveGame(null);
-    setActiveSave(undefined);
+  const installGame = (game: InstalledGame) => {
+    setGames(current => [game, ...current.filter(item => item.id !== game.id)]);
     setActiveTab(AppTab.Library);
   };
 
-  const handleAutosave = () => {
-    if (!activeGame) return;
-
-    setSaves(prevSaves => {
-        const now = new Date();
-        const timestamp = now.toISOString();
-        const saveId = `autosave-${activeGame.id}`;
-
-        // Create or update a distinct "Autosave" entry for this game.
-        // We use the cover URL as a placeholder screenshot since we can't capture the iframe.
-        
-        const existingAutosaveIndex = prevSaves.findIndex(s => s.id === saveId);
-        
-        const newSave: SaveFile = {
-            id: saveId,
-            gameId: activeGame.id,
-            timestamp: timestamp,
-            locationName: "Auto Save Point", 
-            screenshotUrl: activeGame.coverUrl 
-        };
-
-        if (existingAutosaveIndex >= 0) {
-            const updated = [...prevSaves];
-            updated[existingAutosaveIndex] = newSave;
-            return updated;
-        }
-
-        return [newSave, ...prevSaves];
-    });
+  const playGame = (game: InstalledGame) => {
+    const updated = { ...game, lastPlayedAt: new Date().toISOString() };
+    setGames(current => current.map(item => item.id === game.id ? updated : item));
+    setActiveGame(updated);
+    setActiveTab(AppTab.Player);
   };
 
-  // Render content based on active tab
-  const renderContent = () => {
-    if (activeTab === AppTab.Player && activeGame) {
-      return (
-        <Player 
-          key={activeGame.id}
-          game={activeGame} 
-          initialSave={activeSave} 
-          onExit={handleExitGame} 
-          onAutosave={handleAutosave}
-        />
-      );
-    }
-
-    // Main layout for Library and Store
-    return (
-      <div className="min-h-screen bg-[#18181b] text-zinc-200">
-        <main className="max-w-5xl mx-auto pt-4">
-          {activeTab === AppTab.Library && (
-            <Library 
-              games={libraryGames} 
-              saves={saves}
-              onPlayGame={handlePlayGame} 
-            />
-          )}
-          {activeTab === AppTab.Store && (
-            <Store 
-              onInstall={handleInstallGame} 
-              installedGameIds={libraryGames.map(g => g.id)}
-            />
-          )}
-        </main>
-        <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-      </div>
-    );
-  };
+  if (activeTab === AppTab.Player && activeGame) {
+    return <Player game={activeGame} settings={settings} onExit={() => {
+      setActiveGame(null);
+      setActiveTab(AppTab.Library);
+    }} />;
+  }
 
   return (
-    <>
-      {renderContent()}
-    </>
+    <div className="app-shell">
+      <main className="app-content">
+        {activeTab === AppTab.Library && <Library games={games} onPlay={playGame} />}
+        {activeTab === AppTab.Store && <Store installedIds={games.map(game => game.id)} onInstall={installGame} />}
+        {activeTab === AppTab.Settings && <Settings settings={settings} onChange={setSettings} />}
+      </main>
+      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+    </div>
   );
-};
-
-export default App;
+}

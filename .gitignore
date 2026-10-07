@@ -10,11 +10,22 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+playwright-report
+test-results
 *.local
+
+# Android local build state and signing material
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+*.jks
+*.keystore
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/tasks.json
 .idea
 .DS_Store
 *.suo

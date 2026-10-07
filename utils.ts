@@ -1,22 +1,21 @@
-import { PLACEHOLDER_COVER } from './constants';
+import { CatalogGame } from './types';
 
-/**
- * Wraps an image URL in a caching proxy (wsrv.nl) to bypass CORS and Hotlink protection.
- * This is essential for loading images from IFDB and the IF Archive which often block direct browser requests.
- */
-export const getProxiedImageUrl = (url: string | undefined): string => {
-  if (!url) return PLACEHOLDER_COVER;
-  
-  // Return placeholders or data URIs directly
-  if (url.startsWith('data:') || url.includes('placehold.co')) return url;
+const STORY_EXTENSION = /\.(z3|z4|z5|z8|zblorb|zlb|gblorb|glb|ulx|blorb)$/i;
 
-  // Clean the URL
-  const cleanUrl = url.trim();
-  if (!cleanUrl) return PLACEHOLDER_COVER;
+export function formatDate(value?: string): string {
+  if (!value) return 'Not played yet';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
+}
 
-  // Use wsrv.nl (formerly images.weserv.nl) as an image proxy/cache
-  // It supports resizing, optimization, and most importantly, CORS headers.
-  // We remove the protocol 'https://' because wsrv prefers just the domain/path, 
-  // but it handles full URLs too if encoded correctly.
-  return `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}&w=400&h=600&fit=cover&a=top&output=webp`;
-};
+export function storyFileName(game: CatalogGame): string {
+  if (game.fileName && STORY_EXTENSION.test(game.fileName)) return game.fileName;
+
+  try {
+    const name = decodeURIComponent(new URL(game.fileUrl).pathname.split('/').pop() ?? '');
+    if (STORY_EXTENSION.test(name)) return name;
+  } catch {
+    // Older local-library records did not retain their original filename.
+  }
+
+  return 'story.z5';
+}

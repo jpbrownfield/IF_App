@@ -1,35 +1,37 @@
-export interface Game {
+export interface CatalogGame {
   id: string;
   title: string;
   author: string;
   description: string;
-  coverUrl: string;
-  fileUrl: string; // The actual .z5, .z8, or .gblorb file URL
-  dateInstalled: string;
-  lastPlayed: string;
-  playtime: string;
-  genre: string;
-  isAiStory?: boolean;
+  fileUrl: string;
+  fileName?: string;
+  coverUrl?: string;
+  ifdbUrl?: string;
   rating?: number;
-  publishDate?: string;
+  published?: string;
+  format?: string;
 }
 
-export interface SaveFile {
-  id: string;
-  gameId: string;
-  timestamp: string;
-  locationName: string;
-  screenshotUrl?: string; 
-}
-
-export enum SortOption {
-  Name = 'Name',
-  DateInstalled = 'Date Installed',
-  LastPlayed = 'Last Played'
+export interface InstalledGame extends CatalogGame {
+  installedAt: string;
+  lastPlayedAt?: string;
 }
 
 export enum AppTab {
   Library = 'library',
   Store = 'store',
-  Player = 'player'
+  Player = 'player',
+  Settings = 'settings',
+}
+
+export type AutosaveMode = 'turn' | 'off';
+
+export interface AppSettings {
+  customKeyboard: boolean;
+  keyboardShortcuts: boolean;
+  swipeControls: boolean;
+  keyboardColor: string;
+  fontSize: number;
+  backgroundColor: string;
+  autosave: AutosaveMode;
 }

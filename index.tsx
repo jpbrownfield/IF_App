@@ -1,15 +1,15 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Capacitor } from '@capacitor/core';
 import App from './App';
+import './index.css';
 
 // Register Service Worker for offline support
-if ('serviceWorker' in navigator) {
+if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then(registration => {
-      console.log('SW registered: ', registration);
-    }).catch(registrationError => {
-      console.log('SW registration failed: ', registrationError);
+    navigator.serviceWorker.register('./sw.js').catch(error => {
+      console.error('Offline support could not start.', error);
     });
   });
 }

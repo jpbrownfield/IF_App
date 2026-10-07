@@ -1,151 +1,99 @@
+const CACHE_NAME = 'fableforge-v10';
+const CORE_ASSETS = ['./', './index.html', './manifest.json', './parchment.html', './catalog.json'];
+const DATABASE_NAME = 'FableForgeDB';
+const GAME_STORE = 'gameFiles';
 
-const CACHE_NAME = 'fableforge-v3';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  './parchment.html'
-];
-
-self.addEventListener('install', (event) => {
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(CORE_ASSETS)));
   self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      // We only strictly require local assets for installation
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+    caches.keys()
+      .then(names => Promise.all(names.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))))
+      .then(() => self.clients.claim()),
   );
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
-      );
-    }).then(() => self.clients.claim())
-  );
-});
+function readGame(gameId) {
+  return new Promise((resolve, reject) => {
+    const openRequest = indexedDB.open(DATABASE_NAME, 1);
+    openRequest.onerror = () => reject(openRequest.error);
+    openRequest.onsuccess = () => {
+      const database = openRequest.result;
+      const request = database.transaction(GAME_STORE).objectStore(GAME_STORE).get(gameId);
+      request.onsuccess = () => {
+        database.close();
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        database.close();
+        reject(request.error);
+      };
+    };
+  });
+}
 
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  
-  // Handle local game file requests (Virtual File System)
-  if (url.pathname.includes('/local-game/')) {
-      const parts = url.pathname.split('/local-game/');
-      if (!parts[1]) return; 
-      
-      const gameId = decodeURIComponent(parts[1]);
-      event.respondWith(
-          (async () => {
-              try {
-                  const db = await new Promise((resolve, reject) => {
-                      const req = indexedDB.open('FableForgeDB', 1);
-                      req.onsuccess = () => resolve(req.result);
-                      req.onerror = () => reject(req.error);
-                  });
-                  
-                  const blob = await new Promise((resolve, reject) => {
-                      const tx = db.transaction('gameFiles', 'readonly');
-                      const store = tx.objectStore('gameFiles');
-                      const req = store.get(gameId);
-                      req.onsuccess = () => resolve(req.result);
-                      req.onerror = () => reject(req.error);
-                  });
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
 
-                  if (!blob) return new Response('Game not found', { status: 404 });
-                  
-                  return new Response(blob, {
-                      headers: {
-                          'Content-Type': 'application/octet-stream',
-                          'Content-Disposition': `inline; filename="game.z5"`
-                      }
-                  });
-              } catch (e) {
-                  console.error("SW: Failed to serve local game", e);
-                  return new Response('Error loading local game', { status: 500 });
-              }
-          })()
-      );
-      return;
+  const requestUrl = new URL(event.request.url);
+  const marker = '/local-game/';
+  const markerIndex = requestUrl.pathname.indexOf(marker);
+
+  if (markerIndex >= 0) {
+    const storyPath = requestUrl.pathname.slice(markerIndex + marker.length);
+    const gameId = decodeURIComponent(storyPath.split('/')[0]);
+    event.respondWith(
+      readGame(gameId)
+        .then(file => file
+          ? new Response(file, { headers: { 'Content-Type': 'application/octet-stream' } })
+          : new Response('Story file not found.', { status: 404 }))
+        .catch(() => new Response('Could not read the story file.', { status: 500 })),
+    );
+    return;
   }
 
-  // Handle Remote Game Proxy (Stable URL for Autosaves + CORS Bypass)
-  // Maps /remote-game-proxy/<encoded_url> to the actual file content via proxies
-  if (url.pathname.includes('/remote-game-proxy/')) {
-      const parts = url.pathname.split('/remote-game-proxy/');
-      if (!parts[1]) return;
+  if (requestUrl.origin !== self.location.origin) return;
 
-      const targetUrl = decodeURIComponent(parts[1]);
-      console.log(`[SW] Proxying request for: ${targetUrl}`);
-      
-      event.respondWith(
-          (async () => {
-              const proxies = [
-                  // 1. CorsProxy.io (Fast, binary support)
-                  (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-                  // 2. AllOrigins Raw (Backup)
-                  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`
-              ];
-
-              for (const createProxyUrl of proxies) {
-                  try {
-                      const proxyUrl = createProxyUrl(targetUrl);
-                      console.log(`[SW] Trying proxy: ${proxyUrl}`);
-                      const response = await fetch(proxyUrl);
-                      if (response.ok) {
-                          // Return a new response to ensure headers are clean/correct for Parchment
-                          const blob = await response.blob();
-                          console.log(`[SW] Successfully fetched via proxy. Size: ${blob.size}`);
-                          return new Response(blob, {
-                              status: 200,
-                              headers: {
-                                  'Content-Type': 'application/octet-stream',
-                                  // Add Access-Control-Allow-Origin just in case, though SW response usually ignores it for same-origin
-                                  'Access-Control-Allow-Origin': '*',
-                                  'Cache-Control': 'public, max-age=31536000' 
-                              }
-                          });
-                      }
-                  } catch (e) {
-                      console.warn(`[SW] Proxy failed for ${targetUrl}`, e);
-                  }
-              }
-
-              // Fallback: Try direct (might work if CORS is enabled on source)
-              try {
-                  console.log(`[SW] Trying direct fetch: ${targetUrl}`);
-                  const directRes = await fetch(targetUrl);
-                  if (directRes.ok) return directRes;
-              } catch (e) { /* ignore */ }
-
-              console.error(`[SW] All strategies failed for ${targetUrl}`);
-              return new Response("Failed to load game file from all sources.", { status: 502 });
-          })()
-      );
-      return;
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response.ok) {
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then(cached => cached || Response.error())),
+    );
+    return;
   }
 
-  // Stale-While-Revalidate Strategy for other assets
+  if (requestUrl.pathname.endsWith('/catalog.json')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response.ok) {
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then(cached => cached || Response.error())),
+    );
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        // Only cache successful same-origin responses
-        // This prevents CORS errors with external CDNs like Tailwind
-        const isSameOrigin = url.origin === self.location.origin;
-        if (isSameOrigin && networkResponse && networkResponse.status === 200) {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, responseToCache);
-            });
+    caches.match(event.request).then(cached => {
+      const fresh = fetch(event.request).then(response => {
+        if (response.ok) {
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
         }
-        return networkResponse;
-      }).catch((err) => {
-          // If network fails, we rely on cache
-          console.warn("[SW] Fetch failed:", event.request.url, err);
+        return response;
       });
-      
-      return cachedResponse || fetchPromise;
-    })
+      return cached || fresh;
+    }),
   );
 });

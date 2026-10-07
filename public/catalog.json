@@ -1,0 +1,79 @@
+[
+  {
+    "id": "905",
+    "title": "9:05",
+    "author": "Adam Cadre",
+    "description": "A short, approachable introduction to parser interactive fiction.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/905.z5"
+  },
+  {
+    "id": "lost-pig",
+    "title": "Lost Pig",
+    "author": "Admiral Jota",
+    "description": "A warm comic adventure about an orc trying to recover a missing pig.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/LostPig.z8"
+  },
+  {
+    "id": "dreamhold",
+    "title": "The Dreamhold",
+    "author": "Andrew Plotkin",
+    "description": "A welcoming tutorial game with plenty of secrets for experienced players.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/dreamhold.z8"
+  },
+  {
+    "id": "bronze",
+    "title": "Bronze",
+    "author": "Emily Short",
+    "description": "A beginner-friendly retelling of Beauty and the Beast.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/Bronze.zblorb"
+  },
+  {
+    "id": "galatea",
+    "title": "Galatea",
+    "author": "Emily Short",
+    "description": "A conversation with a living statue that can unfold in many directions.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/Galatea.zblorb"
+  },
+  {
+    "id": "photopia",
+    "title": "Photopia",
+    "author": "Adam Cadre",
+    "description": "A landmark, story-forward work told through a sequence of vivid scenes.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/photopia.z5"
+  },
+  {
+    "id": "shade",
+    "title": "Shade",
+    "author": "Andrew Plotkin",
+    "description": "A compact, unsettling story about preparing for a trip to the desert.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/shade.z5"
+  },
+  {
+    "id": "aisle",
+    "title": "Aisle",
+    "author": "Sam Barlow",
+    "description": "One supermarket aisle, one turn, and a remarkable number of possible lives.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/Aisle.z5"
+  },
+  {
+    "id": "spider-and-web",
+    "title": "Spider and Web",
+    "author": "Andrew Plotkin",
+    "description": "A tense interrogation and espionage story built around unreliable memory.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/Tangle.z5"
+  },
+  {
+    "id": "make-it-good",
+    "title": "Make It Good",
+    "author": "Jon Ingold",
+    "description": "A demanding noir investigation in which the detective is part of the mystery.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/MakeItGood.z8"
+  },
+  {
+    "id": "savoir-faire",
+    "title": "Savoir-Faire",
+    "author": "Emily Short",
+    "description": "Historical fantasy, intricate puzzles, and a magic system based on resemblance.",
+    "fileUrl": "https://ifarchive.org/if-archive/games/zcode/Savoir-Faire.zblorb"
+  }
+]
