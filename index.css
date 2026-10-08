@@ -121,15 +121,15 @@ button:not(:disabled):active { transform: scale(.96); }
 .player-stage iframe { width: 100%; height: 100%; border: 0; background: #fff; }
 .player-message { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; padding: 2rem; color: #a1a1aa; text-align: center; }
 .player-message p { max-width: 22rem; line-height: 1.5; }
-
-.custom-keyboard { flex: 0 0 auto; padding: .45rem .4rem max(.45rem, env(safe-area-inset-bottom)); border-top: 1px solid #fff; color: #fff; user-select: none; touch-action: none; }
+.custom-keyboard { position: relative; flex: 0 0 auto; padding: .45rem .4rem max(.45rem, env(safe-area-inset-bottom)); border-top: 1px solid #fff; color: #fff; user-select: none; touch-action: none; }
 .custom-keyboard button { min-width: 2.2rem; min-height: 2.15rem; padding: 0 .42rem; border: 1px solid rgba(255,255,255,.88); border-radius: .35rem; background: rgba(0,0,0,.2); color: #fff; font-size: .76rem; font-weight: 750; box-shadow: 0 1px 0 rgba(255,255,255,.16); }
-.custom-keyboard button:active { transform: translateY(1px); background: rgba(255,255,255,.22); }
-.command-strip { display: flex; gap: .3rem; overflow-x: auto; padding: 0 0 .35rem; scrollbar-width: none; }
+.custom-keyboard button:active, .custom-keyboard button.key-pressed { transform: translateY(1px); border-color: #fff; background: #fff; color: #09090b; box-shadow: 0 0 .7rem rgba(255,255,255,.65); }
+.custom-keyboard .keyboard-collapse-button { position: absolute; z-index: 2; top: .4rem; right: .4rem; display: grid; place-items: center; width: 2.2rem; padding: 0; }
+.keyboard-collapse-button svg { width: 1.1rem; height: 1.1rem; }
+.custom-keyboard.minimized { min-height: 3rem; padding-bottom: max(.4rem, env(safe-area-inset-bottom)); }
+.command-strip { display: flex; gap: .3rem; overflow-x: auto; padding: 0 2.65rem .35rem 0; scrollbar-width: none; }
 .command-strip::-webkit-scrollbar { display: none; }
 .command-strip button { flex: 0 0 auto; min-height: 1.9rem; }
-.shortcut-strip { padding-top: 0; }
-.shortcut-strip button { min-width: 2.6rem; border-style: dashed; }
 .letter-keys { display: grid; gap: .28rem; }
 .letter-row { display: flex; justify-content: center; gap: .25rem; }
 .letter-row button { flex: 1 1 0; max-width: 2.75rem; min-width: 0; padding: 0; }
@@ -140,8 +140,6 @@ button:not(:disabled):active { transform: scale(.96); }
 .utility-row .space-key { max-width: none; flex: 4 1 0; }
 .utility-row svg { width: 1rem; height: 1rem; }
 .utility-row .listening { border-color: #fca5a5; background: #7f1d1d; animation: dictation-pulse 1.2s ease-in-out infinite; }
-.swipe-hint, .keyboard-message { display: block; padding-top: .3rem; color: #d4d4d8; font-size: .62rem; text-align: center; }
-.keyboard-message { color: #fecaca; }
 
 @keyframes dictation-pulse {
   0%, 100% { border-color: #fff; box-shadow: 0 0 0 0 rgba(248,113,113,.15); }

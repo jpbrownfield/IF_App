@@ -33,3 +33,4 @@ android/build/
 *.njsproj
 *.sln
 *.sw?
+run-local.ps1

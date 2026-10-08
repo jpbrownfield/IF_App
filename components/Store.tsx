@@ -125,7 +125,7 @@ export default function Store({ installedIds, onInstall }: StoreProps) {
       <header className="page-header">
         <div>
           <p className="eyebrow">Find your next story</p>
-          <h1>Browse Library</h1>
+          <h1>Browse Stories</h1>
         </div>
       </header>
 

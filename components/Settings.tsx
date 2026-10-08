@@ -79,7 +79,7 @@ export default function Settings({ settings, onChange }: SettingsProps) {
           onChange={value => update('customKeyboard', value)} />
         <div className="nested-settings" aria-disabled={!settings.customKeyboard}>
           <Toggle checked={settings.keyboardShortcuts} disabled={!settings.customKeyboard}
-            label="Keyboard shortcuts" description="Show shortcut commands above the keyboard."
+            label="Keyboard shortcuts" description="Show the N, S, E, W, In, Out, Up, and Down movement buttons."
             onChange={value => update('keyboardShortcuts', value)} />
           <Toggle checked={settings.swipeControls} disabled={!settings.customKeyboard}
             label="Glide typing" description="Trace across letter keys to compose words."
@@ -116,12 +116,12 @@ export default function Settings({ settings, onChange }: SettingsProps) {
       </div>
 
       <div className="settings-section">
-        <div className="settings-heading"><Save aria-hidden="true" /><div><h2>Autosave</h2><p>Parchment restores the latest VM snapshot for each story.</p></div></div>
+        <div className="settings-heading"><Save aria-hidden="true" /><div><h2>Autosave</h2><p>Uses each story's real save and restore commands with a private autosave slot.</p></div></div>
         <label className="select-setting">
-          <span><strong>Frequency</strong><small>Every turn is Parchment's native, safest checkpoint.</small></span>
+          <span><strong>Frequency</strong><small>Also saves when leaving a story and when the app enters the background.</small></span>
           <select aria-label="Autosave frequency" value={settings.autosave}
             onChange={event => update('autosave', event.target.value as AppSettings['autosave'])}>
-            <option value="turn">Every turn</option>
+            <option value="five-minutes">Every 5 minutes</option>
             <option value="off">Off</option>
           </select>
         </label>

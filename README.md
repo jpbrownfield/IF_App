@@ -48,7 +48,7 @@ Settings are stored locally and include the custom-keyboard master switch, keybo
 
 ## Story catalog
 
-The Browse Library catalog follows the same basic model as Frotz: IFDB supplies discovery metadata and the IF Archive supplies the playable files. Because IFDB's API is not available to browser JavaScript through CORS, `public/catalog.json` is a generated snapshot rather than an unreliable client-side proxy request.
+The Browse Stories catalog follows the same basic model as Frotz: IFDB supplies discovery metadata and the IF Archive supplies the playable files. Because IFDB's API is not available to browser JavaScript through CORS, `public/catalog.json` is a generated snapshot rather than an unreliable client-side proxy request.
 
 Run `npm run catalog:update` to refresh it from IFDB. The updater keeps only directly playable Z-machine and Glulx files hosted by the IF Archive, caches available cover thumbnails locally, and leaves the existing snapshot intact if IFDB is unavailable. The GitHub Pages workflow also refreshes and redeploys the catalog every Monday.
 

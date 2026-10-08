@@ -15,6 +15,10 @@ export default defineConfig({
       name: 'android-chromium',
       use: { ...devices['Pixel 7'] },
     },
+    {
+      name: 'desktop-chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   webServer: {
     command: 'npm run preview -- --host 127.0.0.1',

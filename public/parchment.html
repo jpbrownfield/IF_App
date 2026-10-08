@@ -4,6 +4,11 @@
     <meta charset="utf-8">
     <title>Parchment 2026.8.23</title>
     <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0">
+    <style>
+    #gameport { max-width: none !important; }
+    html.fableforge-file-operation dialog.asyncglk_file_dialog[open] { visibility: hidden !important; }
+    .fableforge-hidden-output { display: none !important; }
+    </style>
     <script>
     // FableForge integration around the official Parchment single-file build.
     const fableForgeParams = new URLSearchParams(window.location.search);
@@ -42,6 +47,11 @@
     rootStyle.setProperty('color-scheme', luminance > 0.42 ? 'light' : 'dark');
 
     const useFableForgeKeyboard = fableForgeParams.get('custom_keyboard') === '1';
+    const useFableForgeAutosave = fableForgeParams.get('fableforge_autosave') === '1';
+    const shouldFableForgeRestore = fableForgeParams.get('fableforge_restore') === '1';
+    let fableForgeFileOperation = null;
+    let fableForgeRestoreStarted = false;
+    let fableForgeOperationTimer = 0;
     function configureFableForgeInput(input) {
         if (!input || !useFableForgeKeyboard) return;
         if (input.getAttribute('inputmode') !== 'none') input.setAttribute('inputmode', 'none');
@@ -53,15 +63,179 @@
             return !input.disabled && input.getAttribute('aria-hidden') !== 'true';
         });
     }
+    function dispatchFableForgeEnter(input) {
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        if (window.jQuery) {
+            window.jQuery(input).trigger(window.jQuery.Event('keypress', { which: 13, keyCode: 13 }));
+        } else {
+            input.dispatchEvent(new KeyboardEvent('keypress', {
+                key: 'Enter',
+                code: 'Enter',
+                bubbles: true
+            }));
+        }
+    }
+    function hideFableForgeOperationOutput(operation) {
+        const lines = Array.from(document.querySelectorAll('.BufferWindowInner > .BufferLine'));
+        const newLines = lines.filter(function(line) { return !operation.transcriptLines.has(line); });
+        const originalCommandLine = operation.commandLine;
+        const originalMatches = originalCommandLine && document.contains(originalCommandLine)
+            && (originalCommandLine.querySelector('.Style_input')?.textContent || '').trim().toLowerCase() === operation.type;
+        const commandLine = originalMatches ? originalCommandLine : newLines.reverse().find(function(line) {
+            return (line.querySelector('.Style_input')?.textContent || '').trim().toLowerCase() === operation.type;
+        });
+        if (!commandLine) return;
+        commandLine.classList.add('fableforge-hidden-output');
+        let next = commandLine.nextElementSibling;
+        while (next?.classList.contains('BufferLine') && !next.querySelector('textarea.Input')) {
+            const text = (next.textContent || '').replace(/\u00a0/g, ' ').trim().toLowerCase();
+            if (text && !['ok.', 'saved.', 'restored.'].includes(text)) break;
+            next.classList.add('fableforge-hidden-output');
+            next = next.nextElementSibling;
+        }
+    }
+    function hideFableForgeInterpreterNotices() {
+        document.querySelectorAll('.BufferWindowInner > .BufferLine').forEach(function(line) {
+            const text = (line.textContent || '').replace(/\u00a0/g, ' ').trim().toLowerCase();
+            if (text === '[starting history playback]' || text === '[end of history playback]') {
+                line.classList.add('fableforge-hidden-output');
+            }
+        });
+    }
+    function finishFableForgeFileOperation(success, detail) {
+        if (!fableForgeFileOperation) return;
+        const operation = fableForgeFileOperation;
+        fableForgeFileOperation = null;
+        clearTimeout(fableForgeOperationTimer);
+        document.documentElement.classList.remove('fableforge-file-operation');
+        window.parent.postMessage({
+            type: operation.type === 'save' ? 'fableforge-autosave-result' : 'fableforge-autorestore-result',
+            success: Boolean(success),
+            reason: operation.reason,
+            detail: detail || ''
+        }, window.location.origin);
+        hideFableForgeOperationOutput(operation);
+        [50, 150, 400, 800].forEach(function(delay) {
+            window.setTimeout(function() { hideFableForgeOperationOutput(operation); }, delay);
+        });
+        if (operation.type === 'save' && operation.previousValue) {
+            const restoreDraft = function() {
+                const input = currentFableForgeInput();
+                if (input && !input.value) {
+                    input.value = operation.previousValue;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            };
+            requestAnimationFrame(restoreDraft);
+            [50, 150, 400, 800].forEach(function(delay) {
+                window.setTimeout(restoreDraft, delay);
+            });
+        }
+    }
+    function startFableForgeFileOperation(type, reason) {
+        if (!useFableForgeAutosave) return false;
+        if (fableForgeFileOperation) {
+            if (type === 'save' && fableForgeFileOperation.type === 'restore') {
+                window.parent.postMessage({
+                    type: 'fableforge-autosave-result',
+                    success: false,
+                    reason: reason,
+                    detail: 'Restore is still in progress.'
+                }, window.location.origin);
+            }
+            return false;
+        }
+        const input = currentFableForgeInput();
+        if (!input || document.querySelector('dialog[open]')) {
+            window.parent.postMessage({
+                type: type === 'save' ? 'fableforge-autosave-result' : 'fableforge-autorestore-result',
+                success: false,
+                reason: reason,
+                detail: 'The story is not waiting for a command.'
+            }, window.location.origin);
+            return false;
+        }
+        if (type === 'save' && reason === 'scheduled' && input.value) {
+            window.parent.postMessage({
+                type: 'fableforge-autosave-result',
+                success: false,
+                skipped: true,
+                reason: reason,
+                detail: 'The command line contains an unfinished command.'
+            }, window.location.origin);
+            return false;
+        }
+        fableForgeFileOperation = {
+            type: type,
+            reason: reason,
+            input: input,
+            previousValue: input.value,
+            commandLine: input.closest('.BufferLine'),
+            transcriptLines: new Set(document.querySelectorAll('.BufferWindowInner > .BufferLine')),
+            submitted: false
+        };
+        document.documentElement.classList.add('fableforge-file-operation');
+        input.value = type;
+        dispatchFableForgeEnter(input);
+        fableForgeOperationTimer = window.setTimeout(function() {
+            const dialog = document.querySelector('dialog.asyncglk_file_dialog[open]');
+            dialog?.querySelector('button.close')?.click();
+            finishFableForgeFileOperation(false, 'The story did not complete the ' + type + ' command.');
+        }, 6000);
+        scheduleFableForgeInputNotification();
+        return true;
+    }
+    function handleFableForgeFileOperation() {
+        const operation = fableForgeFileOperation;
+        if (!operation) return;
+        const dialog = document.querySelector('dialog.asyncglk_file_dialog[open]');
+        if (dialog && !operation.submitted) {
+            hideFableForgeOperationOutput(operation);
+            const title = (dialog.querySelector('#title')?.textContent || '').toLowerCase();
+            if (operation.type === 'save' && title.includes('save')) {
+                const filename = dialog.querySelector('#filename_input');
+                if (!filename) return;
+                filename.value = 'autosave';
+                filename.dispatchEvent(new Event('input', { bubbles: true }));
+                filename.dispatchEvent(new Event('change', { bubbles: true }));
+                operation.submitted = true;
+                dialog.querySelector('button.submit')?.click();
+            } else if (operation.type === 'restore' && title.includes('open')) {
+                const autosave = dialog.querySelector('button[data-fullpath$="/autosave.glksave"], button[data-fullpath$="/autosave.sav"]');
+                if (!autosave) return;
+                autosave.click();
+                operation.submitted = true;
+                dialog.querySelector('button.submit')?.click();
+            }
+            return;
+        }
+        const input = currentFableForgeInput();
+        if (operation.submitted && !dialog && input && !operation.completionScheduled) {
+            operation.completionScheduled = true;
+            window.setTimeout(function() {
+                if (fableForgeFileOperation !== operation) return;
+                const currentDialog = document.querySelector('dialog.asyncglk_file_dialog[open]');
+                const currentInput = currentFableForgeInput();
+                if (!currentDialog && currentInput) finishFableForgeFileOperation(true);
+                else operation.completionScheduled = false;
+            }, 300);
+        }
+    }
     let lastFableForgeInput = null;
     let fableForgeInputNotificationPending = false;
     function notifyFableForgeInput() {
         const input = currentFableForgeInput();
         configureFableForgeInput(input);
+        hideFableForgeInterpreterNotices();
+        handleFableForgeFileOperation();
         if (input === lastFableForgeInput) return;
         lastFableForgeInput = input || null;
         if (input) {
             window.parent.postMessage({ type: 'fableforge-keyboard-ready' }, window.location.origin);
+            if (useFableForgeAutosave && shouldFableForgeRestore && !fableForgeRestoreStarted) {
+                fableForgeRestoreStarted = true;
+                window.setTimeout(function() { startFableForgeFileOperation('restore', 'opening'); }, 0);
+            }
         }
     }
     function scheduleFableForgeInputNotification() {
@@ -82,26 +256,30 @@
         if (action === 'backspace') input.value = input.value.slice(0, -1);
         if (action === 'submit') {
             if (typeof event.data.text === 'string') input.value = event.data.text;
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            if (window.jQuery) {
-                window.jQuery(input).trigger(window.jQuery.Event('keypress', { which: 13, keyCode: 13 }));
-            } else {
-                input.dispatchEvent(new KeyboardEvent('keypress', {
-                    key: 'Enter',
-                    code: 'Enter',
-                    bubbles: true
-                }));
-            }
+            dispatchFableForgeEnter(input);
         } else {
             input.dispatchEvent(new Event('input', { bubbles: true }));
         }
     });
+    window.addEventListener('message', function(event) {
+        if (event.origin !== window.location.origin || event.data?.type !== 'fableforge-autosave') return;
+        startFableForgeFileOperation('save', String(event.data.reason || 'scheduled'));
+    });
+    ['keydown', 'keyup'].forEach(function(eventName) {
+        window.addEventListener(eventName, function(event) {
+            window.parent.postMessage({
+                type: 'fableforge-physical-key',
+                key: event.key,
+                pressed: eventName === 'keydown'
+            }, window.location.origin);
+        });
+    });
     window.addEventListener('DOMContentLoaded', function() {
-        if (!useFableForgeKeyboard) return;
+        if (!useFableForgeKeyboard && !useFableForgeAutosave) return;
         const observer = new MutationObserver(scheduleFableForgeInputNotification);
         observer.observe(document.body, {
             attributes: true,
-            attributeFilter: ['aria-hidden', 'disabled'],
+            attributeFilter: ['aria-hidden', 'disabled', 'open'],
             childList: true,
             subtree: true
         });
@@ -110,7 +288,7 @@
 
     parchment_options = {
         "single_file": 1,
-        "do_vm_autosave": 1,
+        "do_vm_autosave": 0,
         "auto_launch": 1,
         "autoplay": 1,
         "play_in_iframe": 1

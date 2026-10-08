@@ -13,7 +13,7 @@ export default function Navigation({ activeTab, onTabChange }: NavigationProps) 
         <BookOpen aria-hidden="true" /><span>Library</span>
       </button>
       <button className={activeTab === AppTab.Store ? 'active' : ''} onClick={() => onTabChange(AppTab.Store)}>
-        <Download aria-hidden="true" /><span>Browse Library</span>
+        <Download aria-hidden="true" /><span>Browse Stories</span>
       </button>
       <button className={activeTab === AppTab.Settings ? 'active' : ''} onClick={() => onTabChange(AppTab.Settings)}>
         <Settings aria-hidden="true" /><span>Settings</span>

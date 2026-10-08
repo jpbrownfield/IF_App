@@ -24,7 +24,7 @@ export enum AppTab {
   Settings = 'settings',
 }
 
-export type AutosaveMode = 'turn' | 'off';
+export type AutosaveMode = 'five-minutes' | 'off';
 
 export interface AppSettings {
   customKeyboard: boolean;

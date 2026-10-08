@@ -1,11 +1,12 @@
-import { CornerDownLeft, Delete, Mic, MicOff, Space } from 'lucide-react';
+import { ChevronDown, ChevronUp, CornerDownLeft, Delete, Mic, MicOff, Space } from 'lucide-react';
 import { PointerEvent, useEffect, useRef, useState } from 'react';
 
 export type KeyboardAction = 'append' | 'backspace' | 'submit';
 
 interface CustomKeyboardProps {
   color: string;
-  shortcuts: boolean;
+  pressedKeys: ReadonlySet<string>;
+  keyboardShortcuts: boolean;
   swipeControls: boolean;
   onInput: (action: KeyboardAction, text?: string) => void;
 }
@@ -42,18 +43,9 @@ type SpeechRecognitionConstructor = {
 
 const LETTER_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
 const MOVEMENT = [
-  ['Go', 'go ', false], ['N', 'north', true], ['S', 'south', true],
-  ['E', 'east', true], ['W', 'west', true], ['In', 'in', true],
-  ['Out', 'out', true], ['Up', 'up', true], ['Down', 'down', true],
+  ['N', 'north'], ['S', 'south'], ['E', 'east'], ['W', 'west'],
+  ['In', 'in'], ['Out', 'out'], ['Up', 'up'], ['Down', 'down'],
 ] as const;
-const SHORTCUTS = [
-  ['X', 'examine ', false, 'Examine'],
-  ['I', 'inventory', true, 'Inventory'],
-  ['T', 'talk to ', false, 'Talk to'],
-  ['L', 'look', true, 'Look'],
-  ['Z', 'wait', true, 'Wait'],
-] as const;
-
 function speechConstructor(): SpeechRecognitionConstructor | undefined {
   const speechWindow = window as typeof window & {
     SpeechRecognition?: SpeechRecognitionConstructor;
@@ -62,9 +54,9 @@ function speechConstructor(): SpeechRecognitionConstructor | undefined {
   return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
 }
 
-export default function CustomKeyboard({ color, shortcuts, swipeControls, onInput }: CustomKeyboardProps) {
+export default function CustomKeyboard({ color, pressedKeys, keyboardShortcuts, swipeControls, onInput }: CustomKeyboardProps) {
+  const [minimized, setMinimized] = useState(false);
   const [listening, setListening] = useState(false);
-  const [speechMessage, setSpeechMessage] = useState<string | null>(null);
   const recognition = useRef<SpeechRecognitionLike | null>(null);
   const dictationEnabled = useRef(false);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
@@ -82,7 +74,6 @@ export default function CustomKeyboard({ color, shortcuts, swipeControls, onInpu
     if (dictationEnabled.current) {
       dictationEnabled.current = false;
       setListening(false);
-      setSpeechMessage('Dictation stopped.');
       const activeRecognition = recognition.current;
       recognition.current = null;
       activeRecognition?.stop();
@@ -90,7 +81,6 @@ export default function CustomKeyboard({ color, shortcuts, swipeControls, onInpu
     }
     const Recognition = speechConstructor();
     if (!Recognition) {
-      setSpeechMessage('Dictation is not available in this browser.');
       return;
     }
     dictationEnabled.current = true;
@@ -105,7 +95,6 @@ export default function CustomKeyboard({ color, shortcuts, swipeControls, onInpu
           if (availability === 'available') {
             localRecognition = true;
           } else if ((availability === 'downloadable' || availability === 'downloading') && Recognition.install) {
-            setSpeechMessage('Preparing offline dictation language pack...');
             localRecognition = await Recognition.install({ langs: [language], processLocally: true });
           }
         } catch {
@@ -134,11 +123,6 @@ export default function CustomKeyboard({ color, shortcuts, swipeControls, onInpu
           dictationEnabled.current = false;
           recognition.current = null;
           setListening(false);
-          setSpeechMessage(event.error === 'not-allowed'
-            ? 'Microphone permission was denied.'
-            : 'Continuous dictation stopped because speech recognition is unavailable.');
-        } else {
-          setSpeechMessage('Listening...');
         }
       };
       instance.onend = () => {
@@ -151,18 +135,15 @@ export default function CustomKeyboard({ color, shortcuts, swipeControls, onInpu
             dictationEnabled.current = false;
             recognition.current = null;
             setListening(false);
-            setSpeechMessage('Continuous dictation stopped. Tap the microphone to try again.');
           }
         }, 250);
       };
       recognition.current = instance;
-      setSpeechMessage(localRecognition ? 'On-device dictation is active.' : 'Using the device speech service; internet may be required.');
       instance.start();
     } catch {
       dictationEnabled.current = false;
       recognition.current = null;
       setListening(false);
-      setSpeechMessage('Dictation could not start. Check microphone permission.');
     }
   };
 
@@ -182,7 +163,7 @@ export default function CustomKeyboard({ color, shortcuts, swipeControls, onInpu
   };
 
   return (
-    <div className="custom-keyboard" style={{ backgroundColor: color }}
+    <div className={`custom-keyboard${minimized ? ' minimized' : ''}`} style={{ backgroundColor: color }}
       onPointerDown={event => { pointerStart.current = { x: event.clientX, y: event.clientY }; }}
       onPointerUp={finishSwipe} onPointerCancel={() => { pointerStart.current = null; }}
       onClickCapture={event => {
@@ -191,16 +172,17 @@ export default function CustomKeyboard({ color, shortcuts, swipeControls, onInpu
         event.stopPropagation();
         suppressClick.current = false;
       }}>
-      <div className="command-strip" aria-label="Movement commands">
-        {MOVEMENT.map(([label, command, submit]) => (
-          <button key={label} type="button" onClick={() => sendCommand(command, submit)}>{label}</button>
-        ))}
-      </div>
-      {shortcuts && (
-        <div className="command-strip shortcut-strip" aria-label="Command shortcuts">
-          {SHORTCUTS.map(([label, command, submit, title]) => (
-            <button key={label} type="button" title={title} aria-label={title}
-              onClick={() => sendCommand(command, submit)}>{label}</button>
+      <button type="button" className="keyboard-collapse-button"
+        aria-label={minimized ? 'Expand keyboard' : 'Minimize keyboard'}
+        aria-expanded={!minimized} onClick={() => setMinimized(value => !value)}>
+        {minimized ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
+      </button>
+      {!minimized && <>
+      {keyboardShortcuts && (
+        <div className="command-strip" aria-label="Movement commands">
+          {MOVEMENT.map(([label, command]) => (
+            <button key={label} type="button" title={`Go ${command}`} aria-label={`Go ${command}`}
+              onClick={() => sendCommand(command, true)}>{label}</button>
           ))}
         </div>
       )}
@@ -208,7 +190,8 @@ export default function CustomKeyboard({ color, shortcuts, swipeControls, onInpu
         {LETTER_ROWS.map(row => (
           <div className="letter-row" key={row}>
             {[...row].map(letter => (
-              <button key={letter} type="button" onClick={() => onInput('append', letter.toLowerCase())}>{letter}</button>
+              <button key={letter} type="button" className={pressedKeys.has(letter.toLowerCase()) ? 'key-pressed' : ''}
+                onClick={() => onInput('append', letter.toLowerCase())}>{letter}</button>
             ))}
           </div>
         ))}
@@ -217,13 +200,12 @@ export default function CustomKeyboard({ color, shortcuts, swipeControls, onInpu
             aria-pressed={listening} onClick={toggleDictation}>
             {listening ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />}
           </button>
-          <button type="button" className="space-key" aria-label="Space" onClick={() => onInput('append', ' ')}><Space aria-hidden="true" /></button>
-          <button type="button" aria-label="Backspace" onClick={() => onInput('backspace')}><Delete aria-hidden="true" /></button>
-          <button type="button" aria-label="Enter command" onClick={() => onInput('submit')}><CornerDownLeft aria-hidden="true" /></button>
+          <button type="button" className={`space-key${pressedKeys.has(' ') ? ' key-pressed' : ''}`} aria-label="Space" onClick={() => onInput('append', ' ')}><Space aria-hidden="true" /></button>
+          <button type="button" className={pressedKeys.has('backspace') ? 'key-pressed' : ''} aria-label="Backspace" onClick={() => onInput('backspace')}><Delete aria-hidden="true" /></button>
+          <button type="button" className={pressedKeys.has('enter') ? 'key-pressed' : ''} aria-label="Enter command" onClick={() => onInput('submit')}><CornerDownLeft aria-hidden="true" /></button>
         </div>
       </div>
-      {swipeControls && <span className="swipe-hint">Glide typing enabled</span>}
-      {speechMessage && <span className="keyboard-message" role="status">{speechMessage}</span>}
+      </>}
     </div>
   );
 }

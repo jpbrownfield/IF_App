@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fableforge-v10';
+const CACHE_NAME = 'fableforge-v17';
 const CORE_ASSETS = ['./', './index.html', './manifest.json', './parchment.html', './catalog.json'];
 const DATABASE_NAME = 'FableForgeDB';
 const GAME_STORE = 'gameFiles';
