@@ -35,11 +35,12 @@ export default function Player({ game, settings, onExit }: PlayerProps) {
     custom_keyboard: settings.customKeyboard ? '1' : '0',
   })}`;
 
-  const sendKeyboardInput = (action: KeyboardAction, text?: string) => {
+  const sendKeyboardInput = (action: KeyboardAction, text?: string, previous?: string) => {
     iframe.current?.contentWindow?.postMessage({
       type: 'fableforge-keyboard-input',
       action,
       text,
+      previous,
     }, window.location.origin);
   };
 
@@ -224,7 +225,7 @@ export default function Player({ game, settings, onExit }: PlayerProps) {
       </div>
       {state === 'ready' && settings.customKeyboard && (
         <CustomKeyboard color={settings.keyboardColor} pressedKeys={pressedKeys}
-          keyboardShortcuts={settings.keyboardShortcuts} swipeControls={settings.swipeControls}
+          keyboardShortcuts={settings.keyboardShortcuts} glideTyping={settings.glideTyping}
           onInput={sendKeyboardInput} />
       )}
     </div>

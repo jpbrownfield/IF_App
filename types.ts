@@ -7,7 +7,9 @@ export interface CatalogGame {
   fileName?: string;
   coverUrl?: string;
   ifdbUrl?: string;
+  ifdbId?: string;
   rating?: number;
+  ratingCount?: number;
   published?: string;
   format?: string;
 }
@@ -29,7 +31,7 @@ export type AutosaveMode = 'five-minutes' | 'off';
 export interface AppSettings {
   customKeyboard: boolean;
   keyboardShortcuts: boolean;
-  swipeControls: boolean;
+  glideTyping: boolean;
   keyboardColor: string;
   fontSize: number;
   backgroundColor: string;

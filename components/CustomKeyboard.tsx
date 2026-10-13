@@ -1,14 +1,15 @@
 import { ChevronDown, ChevronUp, CornerDownLeft, Delete, Mic, MicOff, Space } from 'lucide-react';
 import { PointerEvent, useEffect, useRef, useState } from 'react';
+import { decodeGlide, GlidePoint } from '../services/glide-decoder';
 
-export type KeyboardAction = 'append' | 'backspace' | 'submit';
+export type KeyboardAction = 'append' | 'backspace' | 'submit' | 'replace-tail';
 
 interface CustomKeyboardProps {
   color: string;
   pressedKeys: ReadonlySet<string>;
   keyboardShortcuts: boolean;
-  swipeControls: boolean;
-  onInput: (action: KeyboardAction, text?: string) => void;
+  glideTyping: boolean;
+  onInput: (action: KeyboardAction, text?: string, previous?: string) => void;
 }
 
 interface SpeechRecognitionResultLike {
@@ -21,13 +22,13 @@ interface SpeechRecognitionResultLike {
 
 interface SpeechRecognitionErrorLike {
   error?: string;
+  message?: string;
 }
 
 interface SpeechRecognitionLike {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
-  processLocally?: boolean;
   onresult: ((event: SpeechRecognitionResultLike) => void) | null;
   onerror: ((event: SpeechRecognitionErrorLike) => void) | null;
   onend: (() => void) | null;
@@ -37,8 +38,6 @@ interface SpeechRecognitionLike {
 
 type SpeechRecognitionConstructor = {
   new (): SpeechRecognitionLike;
-  available?: (options: { langs: string[]; processLocally: boolean }) => Promise<string>;
-  install?: (options: { langs: string[]; processLocally: boolean }) => Promise<boolean>;
 };
 
 const LETTER_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
@@ -54,58 +53,55 @@ function speechConstructor(): SpeechRecognitionConstructor | undefined {
   return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
 }
 
-export default function CustomKeyboard({ color, pressedKeys, keyboardShortcuts, swipeControls, onInput }: CustomKeyboardProps) {
+export default function CustomKeyboard({ color, pressedKeys, keyboardShortcuts, glideTyping, onInput }: CustomKeyboardProps) {
   const [minimized, setMinimized] = useState(false);
   const [listening, setListening] = useState(false);
+  const [dictationError, setDictationError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<{ options: string[]; accepted: string } | null>(null);
   const recognition = useRef<SpeechRecognitionLike | null>(null);
   const dictationEnabled = useRef(false);
-  const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const restartTimer = useRef<number | null>(null);
+  const glide = useRef<{ pointerId: number; startX: number; startY: number; letters: string[]; points: GlidePoint[] } | null>(null);
   const suppressClick = useRef(false);
 
-  const sendCommand = (command: string, submit: boolean) =>
+  const sendCommand = (command: string, submit: boolean) => {
+    setSuggestions(null);
     onInput(submit ? 'submit' : 'append', command);
+  };
+
+  const sendKey = (action: KeyboardAction, text?: string) => {
+    setSuggestions(null);
+    onInput(action, text);
+  };
 
   useEffect(() => () => {
     dictationEnabled.current = false;
-    recognition.current?.stop();
+    if (restartTimer.current !== null) window.clearTimeout(restartTimer.current);
+    try { recognition.current?.stop(); } catch { /* Recognition may already have ended. */ }
   }, []);
 
-  const toggleDictation = async () => {
+  const toggleDictation = () => {
+    setDictationError(null);
     if (dictationEnabled.current) {
       dictationEnabled.current = false;
       setListening(false);
+      if (restartTimer.current !== null) window.clearTimeout(restartTimer.current);
       const activeRecognition = recognition.current;
       recognition.current = null;
-      activeRecognition?.stop();
+      try { activeRecognition?.stop(); } catch { /* Recognition may already have ended. */ }
       return;
     }
     const Recognition = speechConstructor();
     if (!Recognition) {
+      setDictationError('Dictation is not available in this browser. Try Chrome or the Android app.');
       return;
     }
     dictationEnabled.current = true;
-    setListening(true);
     try {
       const instance = new Recognition();
-      const language = navigator.language || 'en-US';
-      let localRecognition = false;
-      if (Recognition.available) {
-        try {
-          const availability = await Recognition.available({ langs: [language], processLocally: true });
-          if (availability === 'available') {
-            localRecognition = true;
-          } else if ((availability === 'downloadable' || availability === 'downloading') && Recognition.install) {
-            localRecognition = await Recognition.install({ langs: [language], processLocally: true });
-          }
-        } catch {
-          // Experimental local recognition is optional; use the platform service below.
-        }
-      }
-      if (!dictationEnabled.current) return;
       instance.continuous = true;
       instance.interimResults = false;
-      instance.lang = language;
-      if (localRecognition) instance.processLocally = true;
+      instance.lang = navigator.language || 'en-US';
       instance.onresult = event => {
         const transcripts: string[] = [];
         for (let index = event.resultIndex; index < event.results.length; index += 1) {
@@ -115,59 +111,88 @@ export default function CustomKeyboard({ color, pressedKeys, keyboardShortcuts, 
             if (transcript) transcripts.push(transcript);
           }
         }
-        if (transcripts.length) onInput('append', `${transcripts.join(' ')} `);
+        if (transcripts.length) sendKey('append', `${transcripts.join(' ')} `);
       };
       instance.onerror = event => {
-        const fatalErrors = ['audio-capture', 'language-not-supported', 'network', 'not-allowed', 'service-not-allowed'];
-        if (event.error && fatalErrors.includes(event.error)) {
-          dictationEnabled.current = false;
-          recognition.current = null;
-          setListening(false);
-        }
+        if (!dictationEnabled.current || recognition.current !== instance) return;
+        if (event.error === 'no-speech' || event.error === 'aborted') return;
+        dictationEnabled.current = false;
+        recognition.current = null;
+        setListening(false);
+        const messages: Record<string, string> = {
+          'audio-capture': 'Microphone unavailable. Check that another app is not using it.',
+          'not-allowed': 'Microphone permission was denied. Allow it in your browser or app settings.',
+          'service-not-allowed': 'Speech recognition is blocked on this device or browser.',
+          'network': 'Speech recognition needs a connection on this device. Check your network.',
+          'language-not-supported': 'Speech recognition does not support this language on this device.',
+          'language-unavailable': 'The speech language pack is unavailable on this device.',
+        };
+        const code = event.error || 'unknown';
+        const explanation = messages[code] || 'Dictation failed. Try again.';
+        setDictationError(`${explanation} (Code: ${code}${event.message ? `; ${event.message}` : ''})`);
       };
       instance.onend = () => {
-        if (!dictationEnabled.current) return;
-        window.setTimeout(() => {
-          if (!dictationEnabled.current) return;
+        if (!dictationEnabled.current || recognition.current !== instance) return;
+        restartTimer.current = window.setTimeout(() => {
+          restartTimer.current = null;
+          if (!dictationEnabled.current || recognition.current !== instance) return;
           try {
             instance.start();
           } catch {
             dictationEnabled.current = false;
             recognition.current = null;
             setListening(false);
+            setDictationError('Dictation stopped unexpectedly. Tap the microphone to try again.');
           }
-        }, 250);
+        }, 700);
       };
       recognition.current = instance;
       instance.start();
+      setListening(true);
     } catch {
       dictationEnabled.current = false;
       recognition.current = null;
       setListening(false);
+      setDictationError('Could not start dictation. Check microphone permissions and try again.');
     }
   };
 
-  const finishSwipe = (event: PointerEvent<HTMLDivElement>) => {
-    if (!swipeControls || !pointerStart.current) return;
-    const deltaX = event.clientX - pointerStart.current.x;
-    const deltaY = event.clientY - pointerStart.current.y;
-    pointerStart.current = null;
-    if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 45) return;
+  const trackLetter = (event: PointerEvent<HTMLDivElement>) => {
+    const gesture = glide.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const lastPoint = gesture.points[gesture.points.length - 1];
+    if (Math.hypot(event.clientX - lastPoint.x, event.clientY - lastPoint.y) >= 3) {
+      gesture.points.push({ x: event.clientX, y: event.clientY });
+    }
+    const letter = document.elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLButtonElement>('button[data-letter]')?.dataset.letter;
+    if (letter && gesture.letters[gesture.letters.length - 1] !== letter) gesture.letters.push(letter);
+  };
+
+  const finishGlide = (event: PointerEvent<HTMLDivElement>) => {
+    const gesture = glide.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    trackLetter(event);
+    glide.current = null;
+    if (gesture.letters.length < 2 ||
+      Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) < 12) return;
     suppressClick.current = true;
     window.setTimeout(() => { suppressClick.current = false; }, 300);
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      sendCommand(deltaX > 0 ? 'east' : 'west', true);
-    } else {
-      sendCommand(deltaY > 0 ? 'south' : 'north', true);
-    }
+    const layout = Object.fromEntries([...event.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-letter]')]
+      .map(button => {
+        const bounds = button.getBoundingClientRect();
+        return [button.dataset.letter!, { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }];
+      }));
+    const options = decodeGlide(gesture.points, gesture.letters, layout);
+    if (!options.length) return;
+    setSuggestions({ options, accepted: options[0] });
+    onInput('append', `${options[0]} `);
   };
 
   return (
     <div className={`custom-keyboard${minimized ? ' minimized' : ''}`} style={{ backgroundColor: color }}
-      onPointerDown={event => { pointerStart.current = { x: event.clientX, y: event.clientY }; }}
-      onPointerUp={finishSwipe} onPointerCancel={() => { pointerStart.current = null; }}
       onClickCapture={event => {
-        if (!suppressClick.current) return;
+        if (!suppressClick.current || !(event.target as Element).closest('button[data-letter]')) return;
         event.preventDefault();
         event.stopPropagation();
         suppressClick.current = false;
@@ -186,13 +211,44 @@ export default function CustomKeyboard({ color, pressedKeys, keyboardShortcuts, 
           ))}
         </div>
       )}
-      <div className="letter-keys" aria-label="Custom story keyboard">
-        {LETTER_ROWS.map(row => (
+      {suggestions && (
+        <div className="glide-suggestions" aria-label="Glide suggestions">
+          {suggestions.options.map(word => (
+            <button key={word} type="button" aria-pressed={suggestions.accepted === word}
+              onClick={() => {
+                if (suggestions.accepted === word) return;
+                onInput('replace-tail', `${word} `, `${suggestions.accepted} `);
+                setSuggestions(current => current && { ...current, accepted: word });
+              }}>{word}</button>
+          ))}
+        </div>
+      )}
+      {dictationError && <div className="dictation-error" role="alert">{dictationError}</div>}
+      <div className="letter-keys" aria-label="Custom story keyboard"
+        onPointerDown={event => {
+          if (!glideTyping) return;
+          const key = (event.target as Element).closest<HTMLButtonElement>('button[data-letter]');
+          if (!key?.dataset.letter) return;
+          glide.current = {
+            pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
+            letters: [key.dataset.letter], points: [{ x: event.clientX, y: event.clientY }],
+          };
+          key.setPointerCapture(event.pointerId);
+        }}
+        onPointerMove={trackLetter}
+        onPointerUp={finishGlide}
+        onPointerCancel={() => { glide.current = null; }}>
+        {LETTER_ROWS.map((row, rowIndex) => (
           <div className="letter-row" key={row}>
             {[...row].map(letter => (
-              <button key={letter} type="button" className={pressedKeys.has(letter.toLowerCase()) ? 'key-pressed' : ''}
-                onClick={() => onInput('append', letter.toLowerCase())}>{letter}</button>
+              <button key={letter} type="button" data-letter={letter.toLowerCase()}
+                className={pressedKeys.has(letter.toLowerCase()) ? 'key-pressed' : ''}
+                onClick={() => sendKey('append', letter.toLowerCase())}>{letter}</button>
             ))}
+            {rowIndex === 0 && (
+              <button type="button" className={`backspace-key${pressedKeys.has('backspace') ? ' key-pressed' : ''}`}
+                aria-label="Backspace" onClick={() => sendKey('backspace')}><Delete aria-hidden="true" /></button>
+            )}
           </div>
         ))}
         <div className="letter-row utility-row">
@@ -200,9 +256,8 @@ export default function CustomKeyboard({ color, pressedKeys, keyboardShortcuts, 
             aria-pressed={listening} onClick={toggleDictation}>
             {listening ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />}
           </button>
-          <button type="button" className={`space-key${pressedKeys.has(' ') ? ' key-pressed' : ''}`} aria-label="Space" onClick={() => onInput('append', ' ')}><Space aria-hidden="true" /></button>
-          <button type="button" className={pressedKeys.has('backspace') ? 'key-pressed' : ''} aria-label="Backspace" onClick={() => onInput('backspace')}><Delete aria-hidden="true" /></button>
-          <button type="button" className={pressedKeys.has('enter') ? 'key-pressed' : ''} aria-label="Enter command" onClick={() => onInput('submit')}><CornerDownLeft aria-hidden="true" /></button>
+          <button type="button" className={`space-key${pressedKeys.has(' ') ? ' key-pressed' : ''}`} aria-label="Space" onClick={() => sendKey('append', ' ')}><Space aria-hidden="true" /></button>
+          <button type="button" className={pressedKeys.has('enter') ? 'key-pressed' : ''} aria-label="Enter command" onClick={() => sendKey('submit')}><CornerDownLeft aria-hidden="true" /></button>
         </div>
       </div>
       </>}

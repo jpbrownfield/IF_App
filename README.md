@@ -17,7 +17,7 @@ Create a production build with `npm run build`. Service workers require HTTPS (o
 
 ### Run from VS Code
 
-Use **Terminal → Run Task → Run FableForge locally**, or run `./run-local.ps1` in the integrated PowerShell terminal. The launcher installs missing dependencies, creates a production build, starts the preview server, and opens the app. Press `Ctrl+C` to stop it.
+Use **Terminal → Run Task → Run FableForge locally**, or run `./run-local.ps1` in the integrated PowerShell terminal. The launcher installs missing dependencies, starts Vite with hot reload, and opens the app. Press `Ctrl+C` to stop it.
 
 ### Browser tests
 
@@ -39,17 +39,21 @@ The application ID is `io.github.jpbrownfield.fableforge`. Change it before the 
 
 - Downloaded story files live in IndexedDB.
 - Library metadata lives in local storage.
-- Parchment's VM autosave is enabled and restores progress using the story's stable local URL.
+- The app uses each story's save and restore commands for periodic and background autosaves.
 - Removing browser site data removes downloaded stories and progress.
 
 ## Settings
 
-Settings are stored locally and include the custom-keyboard master switch, keyboard color, story font size, a 25-color reading palette, Parchment autosave, and an app-update check. The compact custom keyboard has letters without punctuation, a separate movement command bar, common parser shortcuts, optional glide typing, and continuous browser/Android dictation when supported. Dictation remains active until toggled off and automatically restarts when Android ends a speech session. Parchment's native autosave captures a VM snapshot after every completed turn; the app exposes that supported frequency or lets the user turn it off.
+Settings are stored locally and include the custom-keyboard master switch, movement shortcuts, glide typing, keyboard color, story font size, a 25-color reading palette, autosave frequency, and an app-update check. The compact custom keyboard has letters without punctuation, a separate movement bar, and continuous browser/Android dictation when supported. Dictation remains active until toggled off and automatically restarts when Android ends a speech session.
+
+Glide typing predicts English words offline from the gesture path and shows alternatives that can replace the last prediction. The generated 20,000-word frequency list comes from [popular-english-words](https://github.com/tkoop/popular-english-words) (ISC license), supplemented with common interactive-fiction terms. Run `npm run glide:lexicon` after updating the source list. Prediction does not yet learn story-specific names or support other languages.
 
 ## Story catalog
 
 The Browse Stories catalog follows the same basic model as Frotz: IFDB supplies discovery metadata and the IF Archive supplies the playable files. Because IFDB's API is not available to browser JavaScript through CORS, `public/catalog.json` is a generated snapshot rather than an unreliable client-side proxy request.
 
 Run `npm run catalog:update` to refresh it from IFDB. The updater keeps only directly playable Z-machine and Glulx files hosted by the IF Archive, caches available cover thumbnails locally, and leaves the existing snapshot intact if IFDB is unavailable. The GitHub Pages workflow also refreshes and redeploys the catalog every Monday.
+
+The Award Winners collection uses verified entries in `data/award-winners.json`. Each entry records an IFDB game ID, award, year, and source link. The catalog updater includes these games even when they are outside the normal search slice, provided IFDB lists a directly playable IF Archive file. Add or edit entries only after checking the award result on IFDB; ratings and nominations alone do not qualify.
 
 Users can still import a compatible local file or a direct URL whose server allows browser downloads (CORS).

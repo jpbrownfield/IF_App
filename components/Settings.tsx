@@ -81,9 +81,9 @@ export default function Settings({ settings, onChange }: SettingsProps) {
           <Toggle checked={settings.keyboardShortcuts} disabled={!settings.customKeyboard}
             label="Keyboard shortcuts" description="Show the N, S, E, W, In, Out, Up, and Down movement buttons."
             onChange={value => update('keyboardShortcuts', value)} />
-          <Toggle checked={settings.swipeControls} disabled={!settings.customKeyboard}
-            label="Glide typing" description="Trace across letter keys to compose words."
-            onChange={value => update('swipeControls', value)} />
+          <Toggle checked={settings.glideTyping} disabled={!settings.customKeyboard}
+            label="Glide typing" description="Trace across letters for offline word prediction."
+            onChange={value => update('glideTyping', value)} />
           <label className={`setting-row color-setting${!settings.customKeyboard ? ' disabled' : ''}`}>
             <span><strong>Keyboard color</strong><small>Choose the keyboard surface color.</small></span>
             <input aria-label="Keyboard color" type="color" value={settings.keyboardColor}

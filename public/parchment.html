@@ -254,6 +254,11 @@
         const action = event.data.action;
         if (action === 'append') input.value += String(event.data.text || '');
         if (action === 'backspace') input.value = input.value.slice(0, -1);
+        if (action === 'replace-tail') {
+            const previous = String(event.data.previous || '');
+            if (!previous || !input.value.endsWith(previous)) return;
+            input.value = input.value.slice(0, -previous.length) + String(event.data.text || '');
+        }
         if (action === 'submit') {
             if (typeof event.data.text === 'string') input.value = event.data.text;
             dispatchFableForgeEnter(input);

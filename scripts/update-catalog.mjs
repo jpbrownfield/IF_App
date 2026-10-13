@@ -4,6 +4,7 @@ import process from 'node:process';
 
 const ROOT = process.cwd();
 const CATALOG_PATH = path.join(ROOT, 'public', 'catalog.json');
+const AWARDS_PATH = path.join(ROOT, 'data', 'award-winners.json');
 const COVERS_PATH = path.join(ROOT, 'public', 'covers');
 const LIMIT = Math.max(1, Number.parseInt(process.env.IFDB_LIMIT || '100', 10));
 const SEARCH = 'system:Inform rating:3- #ratings:2-';
@@ -111,6 +112,7 @@ async function catalogEntry(summary) {
     const coverUrl = await cacheCover(summary.tuid, detail?.ifdb?.coverart?.url || summary.coverArtLink);
     return {
       id: summary.tuid,
+      ifdbId: summary.tuid,
       title: detail?.bibliographic?.title || summary.title,
       author: detail?.bibliographic?.author || summary.author || 'Unknown author',
       description: description.length > 260 ? `${description.slice(0, 257).trimEnd()}…` : description,
@@ -119,7 +121,10 @@ async function catalogEntry(summary) {
       ...(coverUrl ? { coverUrl } : {}),
       ifdbUrl: detail?.ifdb?.link || summary.link,
       ...(Number.isFinite(summary.starRating) ? { rating: summary.starRating } : {}),
-      ...(summary?.published?.machine ? { published: summary.published.machine } : {}),
+      ...(Number.isFinite(summary.numRatings ?? detail?.ifdb?.ratingCountAvg)
+        ? { ratingCount: summary.numRatings ?? detail.ifdb.ratingCountAvg } : {}),
+      ...(summary?.published?.machine || detail?.bibliographic?.firstpublished
+        ? { published: summary?.published?.machine || detail.bibliographic.firstpublished } : {}),
       ...(detail?.identification?.format ? { format: detail.identification.format } : {}),
     };
   } catch (error) {
@@ -138,7 +143,12 @@ async function main() {
     pg: 'all',
   });
   const search = await fetchJson(searchUrl);
-  const summaries = Array.isArray(search.games) ? search.games.slice(0, LIMIT) : [];
+  const awardWinners = JSON.parse(await readFile(AWARDS_PATH, 'utf8'));
+  const searched = Array.isArray(search.games) ? search.games.slice(0, LIMIT) : [];
+  const summaries = [...new Map([
+    ...awardWinners.map(({ ifdbId }) => ({ tuid: ifdbId })),
+    ...searched,
+  ].map(summary => [summary.tuid, summary])).values()];
   if (summaries.length === 0) throw new Error('IFDB returned no search results.');
 
   const entries = (await mapWithConcurrency(summaries, 5, catalogEntry)).filter(Boolean);

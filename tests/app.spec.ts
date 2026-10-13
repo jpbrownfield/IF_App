@@ -180,23 +180,54 @@ test('shows an empty library and filters the starter catalog', async ({ page }) 
 
   await expect(page.getByRole('heading', { name: 'Lost Pig' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '9:05' })).toBeHidden();
+  await page.getByPlaceholder('Search online stories').fill('');
+  await expect(page.locator('.download-card h2').first()).toHaveText('Photopia');
+  await page.getByLabel('Sort by').selectOption('recent');
+  await expect(page.locator('.download-card h2').first()).toHaveText('Make It Good');
+  await page.getByRole('button', { name: 'Import local' }).click();
+  await expect(page.getByRole('heading', { name: 'Import your own story' })).toBeVisible();
+  await expect(page.getByPlaceholder('Search online stories')).toBeHidden();
+  await page.getByRole('button', { name: 'Browse online' }).click();
+  await expect(page.locator('.download-card h2').first()).toHaveText('Make It Good');
+});
+
+test('shows verified, playable award winners with their source and sort controls', async ({ page }) => {
+  await page.getByRole('button', { name: 'Browse Stories', exact: true }).click();
+  await page.getByRole('button', { name: /Award Winners/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Award Winners' })).toBeVisible();
+  await expect(page.locator('.download-card')).toHaveCount(8);
+  await expect(page.getByRole('heading', { name: '9:05' })).toHaveCount(0);
+  await expect(page.locator('.download-card h2').first()).toHaveText('Photopia');
+  await expect(page.getByRole('link', { name: 'Award source for Lost Pig' }))
+    .toHaveAttribute('href', 'https://ifdb.org/viewgame?id=mohwfk47yjzii14w');
+  await expect(page.getByText('XYZZY Awards 2007: Best Game')).toBeVisible();
+
+  await page.getByLabel('Sort by').selectOption('recent');
+  await expect(page.locator('.download-card h2').first()).toHaveText('Lost Pig');
+  await page.getByRole('button', { name: 'All stories' }).click();
+  await expect(page.locator('.download-card')).toHaveCount(11);
 });
 
 test('imports a local story and serves it to Parchment from IndexedDB', async ({ page }) => {
   await page.getByRole('button', { name: 'Browse Stories', exact: true }).click();
+  await page.getByRole('button', { name: 'Import local' }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'test-story.z5',
     mimeType: 'application/x-zmachine',
     buffer: Buffer.from([1, 2, 3, 4]),
   });
 
-  await expect(page.getByRole('heading', { name: 'test story' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Import your own story' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('test story was added');
   const gameId = await page.evaluate(() => {
     const library = JSON.parse(localStorage.getItem('fableforge.library.v2') ?? '[]');
     return library[0]?.id as string | undefined;
   });
   expect(gameId).toBeTruthy();
 
+  await page.getByRole('button', { name: 'Open Library' }).click();
+  await expect(page.getByRole('heading', { name: 'test story' })).toBeVisible();
   await page.getByRole('button', { name: 'Start' }).click();
   const frame = page.locator('iframe');
   await expect(frame).toHaveAttribute('src', new RegExp(`local-game%2F${gameId}%2Ftest-story\\.z5`));
@@ -215,17 +246,22 @@ test('downloads an online catalog story into the library', async ({ page }) => {
   await page.getByRole('button', { name: 'Browse Stories', exact: true }).click();
   await page.getByRole('button', { name: 'Download 9:05' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Browse Stories' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('9:05 was added');
+  await expect(page.getByRole('button', { name: '9:05 added' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Open Library' }).click();
   await expect(page.getByRole('heading', { name: '9:05' })).toBeVisible();
 });
 
 test('saves the active story when the app loses focus', async ({ page }) => {
   await page.getByRole('button', { name: 'Browse Stories', exact: true }).click();
+  await page.getByRole('button', { name: 'Import local' }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'focus-save-test.z5',
     mimeType: 'application/x-zmachine',
     buffer: Buffer.from([1, 2, 3, 4]),
   });
+  await page.getByRole('button', { name: 'Open Library' }).click();
   await page.getByRole('button', { name: 'Start' }).click();
   const playerRoot = page.frameLocator('iframe').locator('html');
   const playerBody = page.frameLocator('iframe').locator('body');
@@ -269,11 +305,13 @@ test('keyboard shortcuts toggle controls only the movement button bar', async ({
   await page.getByRole('checkbox', { name: /Keyboard shortcuts/ }).uncheck();
 
   await page.getByRole('button', { name: 'Browse Stories', exact: true }).click();
+  await page.getByRole('button', { name: 'Import local' }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'shortcut-setting-test.z5',
     mimeType: 'application/x-zmachine',
     buffer: Buffer.from([5, 6, 7, 8]),
   });
+  await page.getByRole('button', { name: 'Open Library' }).click();
   await page.getByRole('button', { name: 'Start' }).click();
 
   await expect(page.getByLabel('Custom story keyboard')).toBeVisible();
@@ -299,11 +337,13 @@ test('persists settings and passes reading preferences to Parchment', async ({ p
   await expect(page.getByLabel('Autosave frequency')).toHaveValue('off');
 
   await page.getByRole('button', { name: 'Browse Stories', exact: true }).click();
+  await page.getByRole('button', { name: 'Import local' }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'settings-test.z5',
     mimeType: 'application/x-zmachine',
     buffer: Buffer.from([5, 6, 7, 8]),
   });
+  await page.getByRole('button', { name: 'Open Library' }).click();
   await page.getByRole('button', { name: 'Start' }).click();
 
   const frameUrl = await page.locator('iframe').getAttribute('src');
@@ -330,6 +370,54 @@ test('persists settings and passes reading preferences to Parchment', async ({ p
   const storyInput = page.frameLocator('iframe').locator('textarea.Input').last();
   await page.getByRole('button', { name: 'Q', exact: true }).click();
   await expect(storyInput).toHaveValue('q');
+  await storyInput.fill('');
+  const wKey = await page.getByRole('button', { name: 'W', exact: true }).boundingBox();
+  const eKey = await page.getByRole('button', { name: 'E', exact: true }).boundingBox();
+  expect(wKey).not.toBeNull();
+  expect(eKey).not.toBeNull();
+  const start = { x: wKey!.x + wKey!.width / 2, y: wKey!.y + wKey!.height / 2 };
+  const end = { x: eKey!.x + eKey!.width / 2, y: eKey!.y + eKey!.height / 2 };
+  if (test.info().project.name === 'android-chromium') {
+    const client = await page.context().newCDPSession(page);
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...start, id: 1 }] });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...end, id: 1 }] });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await client.detach();
+  } else {
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps: 5 });
+    await page.mouse.up();
+  }
+  await expect(storyInput).toHaveValue('we ');
+  await expect(playerRoot).not.toHaveAttribute('data-submitted', /.+/);
+  const alternate = page.getByLabel('Glide suggestions').getByRole('button').nth(1);
+  const alternateWord = await alternate.textContent();
+  await alternate.click();
+  await expect(storyInput).toHaveValue(`${alternateWord} `);
+
+  await storyInput.fill('');
+  const helloPath = await Promise.all(['H', 'E', 'L', 'O'].map(async letter => {
+    const bounds = await page.getByRole('button', { name: letter, exact: true }).boundingBox();
+    expect(bounds).not.toBeNull();
+    return { x: bounds!.x + bounds!.width / 2, y: bounds!.y + bounds!.height / 2 };
+  }));
+  if (test.info().project.name === 'android-chromium') {
+    const client = await page.context().newCDPSession(page);
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...helloPath[0], id: 1 }] });
+    for (const point of helloPath.slice(1)) {
+      await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...point, id: 1 }] });
+    }
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await client.detach();
+  } else {
+    await page.mouse.move(helloPath[0].x, helloPath[0].y);
+    await page.mouse.down();
+    for (const point of helloPath.slice(1)) await page.mouse.move(point.x, point.y, { steps: 5 });
+    await page.mouse.up();
+  }
+  await expect(storyInput).toHaveValue('hello ');
+
   await expect(page.getByLabel('Movement commands').getByRole('button', { name: 'Go', exact: true })).toHaveCount(0);
   await page.getByLabel('Movement commands').getByRole('button', { name: 'Go north', exact: true }).click();
   await expect(playerRoot).toHaveAttribute('data-submitted', 'north:13');
@@ -341,8 +429,20 @@ test('persists settings and passes reading preferences to Parchment', async ({ p
   await expect(storyInput).toHaveValue('q');
   await expect(page.getByRole('button', { name: 'Q', exact: true })).not.toHaveClass(/key-pressed/);
 
+  const topRow = page.getByLabel('Custom story keyboard').locator('.letter-row').first();
+  await expect(topRow.locator('button').last()).toHaveAttribute('aria-label', 'Backspace');
+  await topRow.getByRole('button', { name: 'Backspace' }).click();
+  await expect(storyInput).toHaveValue('');
+  const keyboardBounds = await page.locator('.custom-keyboard').boundingBox();
+  const collapseBounds = await page.getByRole('button', { name: 'Minimize keyboard' }).boundingBox();
+  expect(keyboardBounds).not.toBeNull();
+  expect(collapseBounds).not.toBeNull();
+  expect(collapseBounds!.y + collapseBounds!.height).toBeLessThanOrEqual(keyboardBounds!.y);
+
   await page.getByRole('button', { name: 'Minimize keyboard' }).click();
   await expect(page.getByLabel('Custom story keyboard')).toBeHidden();
+  await expect(page.locator('.custom-keyboard')).toHaveCSS('height', '0px');
+  await expect(page.getByRole('button', { name: 'Expand keyboard' })).toBeVisible();
   await page.getByRole('button', { name: 'Expand keyboard' }).click();
   await expect(page.getByLabel('Custom story keyboard')).toBeVisible();
 
@@ -366,5 +466,40 @@ test('persists settings and passes reading preferences to Parchment', async ({ p
   const stopDictation = page.getByRole('button', { name: 'Stop dictation' });
   await expect(stopDictation).toHaveAttribute('aria-pressed', 'true');
   await stopDictation.click();
+  await expect(page.getByRole('button', { name: 'Start dictation' })).toHaveAttribute('aria-pressed', 'false');
+
+  await page.evaluate(() => {
+    class FailingSpeechRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = '';
+      onresult = null;
+      onerror = null;
+      onend = null;
+      start() { throw new Error('Microphone could not start'); }
+      stop() {}
+    }
+    (window as unknown as { SpeechRecognition: typeof FailingSpeechRecognition }).SpeechRecognition = FailingSpeechRecognition;
+  });
+  await page.getByRole('button', { name: 'Start dictation' }).click();
+  await expect(page.getByRole('alert')).toContainText('Could not start dictation');
+  await expect(page.getByRole('button', { name: 'Start dictation' })).toHaveAttribute('aria-pressed', 'false');
+
+  await page.evaluate(() => {
+    class DeniedSpeechRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = '';
+      onresult = null;
+      onerror: ((event: { error: string }) => void) | null = null;
+      onend = null;
+      start() { queueMicrotask(() => this.onerror?.({ error: 'not-allowed' })); }
+      stop() {}
+    }
+    (window as unknown as { SpeechRecognition: typeof DeniedSpeechRecognition }).SpeechRecognition = DeniedSpeechRecognition;
+  });
+  await page.getByRole('button', { name: 'Start dictation' }).click();
+  await expect(page.getByRole('alert')).toContainText('Microphone permission was denied');
+  await expect(page.getByRole('alert')).toContainText('Code: not-allowed');
   await expect(page.getByRole('button', { name: 'Start dictation' })).toHaveAttribute('aria-pressed', 'false');
 });

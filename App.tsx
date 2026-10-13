@@ -32,7 +32,6 @@ export default function App() {
 
   const installGame = (game: InstalledGame) => {
     setGames(current => [game, ...current.filter(item => item.id !== game.id)]);
-    setActiveTab(AppTab.Library);
   };
 
   const playGame = (game: InstalledGame) => {
@@ -53,7 +52,8 @@ export default function App() {
     <div className="app-shell">
       <main className="app-content">
         {activeTab === AppTab.Library && <Library games={games} onPlay={playGame} />}
-        {activeTab === AppTab.Store && <Store installedIds={games.map(game => game.id)} onInstall={installGame} />}
+        {activeTab === AppTab.Store && <Store installedIds={games.map(game => game.id)} onInstall={installGame}
+          onOpenLibrary={() => setActiveTab(AppTab.Library)} />}
         {activeTab === AppTab.Settings && <Settings settings={settings} onChange={setSettings} />}
       </main>
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
